@@ -22,6 +22,13 @@ func main() {
 			Action:  clicmds.TestAuth,
 			Flags:   clicmds.TestAuthFlags(),
 		},
+		{
+			Name:    "crawl",
+			Aliases: []string{"c"},
+			Usage:   "crawl only",
+			Action:  clicmds.TestCrawler,
+			Flags:   clicmds.TestCrawlerFlags(),
+		},
 	}
 	err := app.Run(os.Args)
 	if err != nil {

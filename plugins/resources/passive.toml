@@ -1,0 +1,19 @@
+[headers]
+class = "Header Checks"
+plugin = "headers.go"
+language = "go"
+id = 1
+
+[[checks]]
+cwe = 16
+name = "CORS header check"
+description = "Checks CORS headers"
+remediation = "fix it"
+checkID = "16.1"
+
+[[checks]]
+cwe = 16
+name = "CORS header check"
+description = "Checks CORS headers"
+remediation = "fix it"
+checkID = "16.2"
