@@ -241,9 +241,9 @@ func (t *Tab) CaptureNetworkTraffic(ctx context.Context, address, port string) {
 			return
 		}
 
-		response := t.buildResponse(port, message)
+		t.buildResponse(port, message)
 		//log.Ctx(ctx).Info().Str("request_id", p.RequestId).Str("url", url).Msg("adding response")
-		t.container.Add(response)
+		//t.container.Add(response)
 	})
 
 	t.t.Subscribe("Network.loadingFinished", func(target *gcd.ChromeTarget, payload []byte) {
@@ -257,18 +257,14 @@ func (t *Tab) CaptureNetworkTraffic(ctx context.Context, address, port string) {
 	})
 }
 
-// buildResponse fills out a new am.HTTPResponse with all relevant details
+// buildResponse fills out a new with all relevant details
 func (t *Tab) buildResponse(requestedPort string, message *gcdapi.NetworkResponseReceivedEvent) {
-	var host string
-	var responsePort string
-	var scheme string
-
 	p := message.Params
 
 	// set additional properties of web certificate
 
 	if p.Type == "Document" {
-		response.IsDocument = true
+		log.Info().Msg("is document")
 	}
 
 }
@@ -292,7 +288,7 @@ func (t *Tab) encodeHeaders(gcdHeaders map[string]interface{}) map[string]string
 	return headers
 }
 
-func (t *Tab) extractCertificate(ipAddress, host, port string, message *gcdapi.NetworkResponseReceivedEvent) {
+func (t *Tab) extractCertificate(ipAddress, host, port string, message *gcdapi.NetworkResponseReceivedEvent) error {
 	p := message.Params
 
 	u, err := url.Parse(p.Response.Url)
@@ -309,6 +305,7 @@ func (t *Tab) extractCertificate(ipAddress, host, port string, message *gcdapi.N
 			cert.Port = port
 		*/
 	}
+	return nil
 }
 
 func (t *Tab) encodeResponseBody(p *gcdapi.NetworkResponseReceivedEvent) string {

@@ -9,6 +9,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+const SOCK = "simpscan.sock"
+
 type SocketLeaser struct {
 	leaserClient http.Client
 }
