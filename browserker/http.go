@@ -10,6 +10,5 @@ type HttpRequest struct {
 
 type HttpResponse struct {
 	gcdapi.NetworkResponse
-	requestID string
-	browserID string
+	request HttpRequest
 }

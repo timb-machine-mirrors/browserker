@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/urfave/cli/v2"
-	"gitlab.com/simpscan/clicmds"
+	"gitlab.com/browserker/clicmds"
 )
 
 func main() {
@@ -26,8 +26,8 @@ func main() {
 			Name:    "crawl",
 			Aliases: []string{"c"},
 			Usage:   "crawl only",
-			Action:  clicmds.TestCrawler,
-			Flags:   clicmds.TestCrawlerFlags(),
+			Action:  clicmds.Crawler,
+			Flags:   clicmds.CrawlerFlags(),
 		},
 	}
 	err := app.Run(os.Args)

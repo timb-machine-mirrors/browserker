@@ -1,4 +1,4 @@
-module gitlab.com/simpscan
+module gitlab.com/browserker
 
 go 1.14
 
@@ -7,6 +7,7 @@ require (
 	github.com/cayleygraph/quad v1.2.4 // indirect
 	github.com/gobuffalo/packr/v2 v2.8.0 // indirect
 	github.com/karrick/godirwalk v1.15.6 // indirect
+	github.com/pelletier/go-toml v1.7.0 // indirect
 	github.com/pkg/errors v0.8.1
 	github.com/rs/zerolog v1.18.0
 	github.com/sirupsen/logrus v1.5.0 // indirect

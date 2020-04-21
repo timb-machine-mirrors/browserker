@@ -1,6 +1,6 @@
 package injections
 
-import "gitlab.com/simpscan/scanner/injections/injast"
+import "gitlab.com/browserker/scanner/injections/injast"
 
 type Cursor struct {
 	// contains filtered or unexported fields

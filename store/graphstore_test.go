@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"gitlab.com/simpscan/store"
+	"gitlab.com/browserker/store"
 )
 
 func TestInit(t *testing.T) {
