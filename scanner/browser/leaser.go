@@ -29,8 +29,8 @@ func randPort() string {
 	return randPort
 }
 
-func randProfile() string {
-	profile, err := ioutil.TempDir("tmp", "gcd")
+func randProfile(tmp string) string {
+	profile, err := ioutil.TempDir(tmp, "gcd")
 	if err != nil {
 		log.Error().Err(err).Msg("failed to create temporary profile directory")
 		return "tmp"
@@ -39,8 +39,8 @@ func randProfile() string {
 	return profile
 }
 
-func RemoveTmpContents() error {
-	files, err := filepath.Glob(filepath.Join("/tmp", "gcd*"))
+func RemoveTmpContents(tmp string) error {
+	files, err := filepath.Glob(filepath.Join(tmp, "gcd*"))
 	if err != nil {
 		return err
 	}

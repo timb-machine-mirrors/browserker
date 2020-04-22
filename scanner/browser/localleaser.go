@@ -14,6 +14,7 @@ type LocalLeaser struct {
 	browserLock    sync.RWMutex
 	browsers       map[string]*gcd.Gcd
 	browserTimeout time.Duration
+	tmp            string
 }
 
 func NewLocalLeaser() *LocalLeaser {
@@ -28,11 +29,14 @@ func NewLocalLeaser() *LocalLeaser {
 func (s *LocalLeaser) Acquire() (string, error) {
 	b := gcd.NewChromeDebugger()
 	b.DeleteProfileOnExit()
-	profileDir := randProfile()
+
+	chrome, tmp := FindChrome()
+	profileDir := randProfile(tmp)
+	s.tmp = tmp
 	port := randPort()
 
 	b.AddFlags(startupFlags)
-	if err := b.StartProcess("/usr/bin/google-chrome", profileDir, port); err != nil {
+	if err := b.StartProcess(chrome, profileDir, port); err != nil {
 		log.Error().Err(err).Msg("failed to start browser")
 		return "", err
 	}
@@ -70,7 +74,7 @@ func (s *LocalLeaser) Cleanup() (string, error) {
 		return "", err
 	}
 
-	if err := RemoveTmpContents(); err != nil {
+	if err := RemoveTmpContents(s.tmp); err != nil {
 		return "", err
 	}
 	return "ok", nil
