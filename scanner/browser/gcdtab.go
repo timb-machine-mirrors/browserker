@@ -192,7 +192,7 @@ func (t *Tab) GetNetworkTraffic() (*Response, []*Response) {
 }
 
 // CaptureNetworkTraffic ensures we capture all traffic (only saving text bodies) during navigation.
-func (t *Tab) CaptureNetworkTraffic(ctx context.Context, address, port string) {
+func (t *Tab) CaptureNetworkTraffic(ctx context.Context, URL string) {
 
 	t.t.Network.EnableWithParams(&gcdapi.NetworkEnableParams{
 		MaxPostDataSize:       -1,
@@ -241,7 +241,7 @@ func (t *Tab) CaptureNetworkTraffic(ctx context.Context, address, port string) {
 			return
 		}
 
-		t.buildResponse(port, message)
+		t.buildResponse(URL, message)
 		//log.Ctx(ctx).Info().Str("request_id", p.RequestId).Str("url", url).Msg("adding response")
 		//t.container.Add(response)
 	})
@@ -258,7 +258,7 @@ func (t *Tab) CaptureNetworkTraffic(ctx context.Context, address, port string) {
 }
 
 // buildResponse fills out a new with all relevant details
-func (t *Tab) buildResponse(requestedPort string, message *gcdapi.NetworkResponseReceivedEvent) {
+func (t *Tab) buildResponse(URL string, message *gcdapi.NetworkResponseReceivedEvent) {
 	p := message.Params
 
 	// set additional properties of web certificate

@@ -5,6 +5,7 @@ go 1.14
 require (
 	github.com/cayleygraph/cayley v0.7.7
 	github.com/cayleygraph/quad v1.2.4 // indirect
+	github.com/davecgh/go-spew v1.1.1
 	github.com/gobuffalo/packr/v2 v2.8.0 // indirect
 	github.com/karrick/godirwalk v1.15.6 // indirect
 	github.com/pelletier/go-toml v1.7.0 // indirect

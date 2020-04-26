@@ -14,3 +14,13 @@ func FindChrome() (string, string) {
 	}
 	return "", ""
 }
+
+func FindKill(browser string) []string {
+	switch runtime.GOOS {
+	case "windows":
+		return []string{"taskkill", "/IM", browser + ".exe"}
+	case "darwin", "linux":
+		return []string{"killall", browser}
+	}
+	return []string{""}
+}

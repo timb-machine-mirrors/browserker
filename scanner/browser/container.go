@@ -10,6 +10,7 @@ type Response struct {
 	RequestID string
 	Body      string
 }
+
 type ResponseContainer struct {
 	responsesLock sync.RWMutex
 	loadRequest   string

@@ -10,8 +10,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
-	"github.com/wirepair/gcd/gcdmessage"
 )
+
+type BrowserPool interface {
+	Take(ctx context.Context) (*gcd.Gcd, error)
+	Return(ctx context.Context, browser *gcd.Gcd)
+}
 
 var startupFlags = []string{
 	//"--allow-insecure-localhost",
@@ -116,7 +120,7 @@ func (b *GCDBrowserPool) Start() error {
 	currentCount := atomic.LoadInt32(&b.startCount)
 	// always have 2 browsers ready
 	for i := 0; i < b.maxBrowsers; i++ {
-		b.Return(timeoutCtx, nil, currentCount) // passing nil will just create a new one for us
+		b.returnBrowser(timeoutCtx, nil, currentCount) // passing nil will just create a new one for us
 		log.Info().Int("i", i).Msg("browser created")
 	}
 
@@ -173,7 +177,7 @@ EMPTY:
 }
 
 // Return a browser
-func (b *GCDBrowserPool) Return(ctx context.Context, browser *gcd.Gcd, startCount int32) {
+func (b *GCDBrowserPool) returnBrowser(ctx context.Context, browser *gcd.Gcd, startCount int32) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 	doneCh := make(chan struct{})
@@ -223,60 +227,28 @@ func (b *GCDBrowserPool) closeAndCreateBrowser(browser *gcd.Gcd, doneCh chan str
 	close(doneCh)
 }
 
-// Load an address of scheme and port, returning an image, the dom, all text based responses or an error.
-func (b *GCDBrowserPool) Load(ctx context.Context, address, scheme, port string) error {
+// Take a browser, user is responsible for closing tabs they opened.
+func (b *GCDBrowserPool) Take(ctx context.Context) (*gcd.Gcd, error) {
 	var browser *gcd.Gcd
-	startCount := atomic.LoadInt32(&b.startCount) // track if we've restarted so we can throw away bad browsers
 
 	if atomic.LoadInt32(&b.closing) == 1 {
-		return ErrBrowserClosing
+		return nil, ErrBrowserClosing
 	}
-
 	// if nil, do not return browser
 	if browser = b.Acquire(ctx); browser == nil {
-		return errors.New("browser acquisition failed during Load")
+		return nil, errors.New("browser acquisition failed during Take")
 	}
-	defer b.Return(ctx, browser, startCount)
 
-	logger := log.With().Str("HostAddress", address).Str("port", port).Str("call", "Load").Logger()
-	ctx = logger.WithContext(ctx)
 	log.Ctx(ctx).Info().Int32("acquired", atomic.LoadInt32(&b.acquiredBrowsers)).Int32("errors", atomic.LoadInt32(&b.acquireErrors)).Msg("acquired browser")
+	return browser, nil
+}
 
-	t, err := browser.GetFirstTab()
-	if err != nil {
-		log.Error().Err(err).Msg("failed to get first tab")
-		return err
-	}
-
-	defer browser.CloseTab(t) // closes websocket go routines
-
-	t.SetApiTimeout(b.browserTimeout)
-
-	tab := NewTab(ctx, t, address)
-	defer tab.Close()
-
-	tab.CaptureNetworkTraffic(ctx, address, port)
-
-	url := b.buildURL(tab, address, scheme, port)
-
-	log.Ctx(ctx).Info().Msg("loading url")
-
-	if err := tab.LoadPage(ctx, url); err != nil {
-		log.Ctx(ctx).Warn().Err(err).Msg("loading page")
-		if err == ErrNavigationTimedOut {
-			return err
-		}
-		if chromeErr, ok := err.(*gcdmessage.ChromeApiTimeoutErr); ok {
-			return errors.Wrap(chromeErr, "failed to load page due to timeout")
-		}
-
-		if errors.Cause(err) == ErrNavigating || errors.Cause(err) == ErrTabCrashed {
-			return err
-		}
-	}
-
-	log.Ctx(ctx).Info().Msg("closed browser")
-	return nil
+// Return a browser for destruction
+func (b *GCDBrowserPool) Return(ctx context.Context, browser *gcd.Gcd) {
+	startCount := atomic.LoadInt32(&b.startCount) // track if we've restarted so we can throw away bad browsers
+	log.Ctx(ctx).Info().Msg("closing browser")
+	b.returnBrowser(ctx, browser, startCount)
+	return
 }
 
 // Close all browsers and return. TODO: make this not terrible.

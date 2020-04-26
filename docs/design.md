@@ -1,5 +1,11 @@
 # Design
 
+## Browsers
+
+A browser is an implementation of gcd.Gcd. The browser pool handles acquiring new browsers and returning old ones. The pool gets browsers from the leaser service which handles starting new ones and closing old ones.
+
+
+
 ## Storage
 
 Pretty much every data type should be stored in cayley (except maybe reporting?)

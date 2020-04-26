@@ -1,0 +1,186 @@
+package navi
+
+type ElementType int16
+
+const (
+	// Main Root
+	HTML ElementType = iota
+
+	// METADATA
+	BASE
+	HEAD
+	LINK
+	META
+	STYLE
+	TITLE
+
+	// Sectioning Root
+	BODY
+
+	//Content
+	ADDRESS
+	ARTICLE
+	ASIDE
+	FOOTER
+	HEADER
+	H1
+	H2
+	H3
+	H4
+	H5
+	H6
+	HGROUP
+	MAIN
+	NAV
+	SECTION
+
+	// Text
+	BLOCKQUOTE
+	DD
+	DIV
+	DL
+	DT
+	FIGCAPTION
+	FIGURE
+	HR
+	LI
+	// MAIN
+	OL
+	P
+	PRE
+	UL
+
+	// Inline Text
+	A
+	ABBR
+	B
+	BDI
+	BDO
+	BR
+	CITE
+	CODE
+	DATA
+	DFN
+	EM
+	I
+	KBD
+	MARK
+	Q
+	RB
+	RP
+	RT
+	RTC
+	RUBY
+	S
+	SAMP
+	SMALL
+	SPAN
+	STRONG
+	SUB
+	SUP
+	TIME
+	U
+	VAR
+	WBR
+
+	// Image and Multimedia
+	AREA
+	AUDIO
+	IMG
+	MAP
+	TRACK
+	VIDEO
+
+	// Embedded
+	EMBED
+	IFRAME
+	OBJECT
+	PARAM
+	PICTURE
+	SOURCE
+
+	// Scripting
+	CANVAS
+	NOSCRIPT
+	SCRIPT
+
+	// Demarcating
+	DEL
+	INS
+
+	// Table Content
+	CAPTION
+	COL
+	COLGROUP
+	TABLE
+	TBODY
+	TD
+	TFOOT
+	TH
+	THEAD
+	TR
+
+	// Forms
+	BUTTON
+	DATALIST
+	FIELDSET
+	FORM
+	INPUT
+	LABEL
+	LEGEND
+	METER
+	OPTGROUP
+	OPTION
+	OUTPUT
+	PROGRESS
+	SELECT
+	TEXTAREA
+
+	// Interactive
+	DETAILS
+	DIALOG
+	MENU
+	SUMMARY
+
+	// Web Components
+	SLOT
+	TEMPLATE
+
+	// Deprecated
+	ACRONYM
+	APPLET
+	BASEFONT
+	BGSOUND
+	BIG
+	BLINK
+	CENTER
+	COMMAND
+	CONTENT
+	DIR
+	ELEMENT
+	FONT
+	FRAME
+	FRAMESET
+	IMAGE
+	ISINDEX
+	KEYGEN
+	LISTING
+	MARQUEE
+	MENUITEM
+	MULTICOL
+	NEXTID
+	NOBR
+	NOEMBED
+	NOFRAMES
+	PLAINTEXT
+	SHADOW
+	SPACER
+	STRIKE
+	TT
+	XMP
+)
+
+type Element struct {
+	Type   ElementType
+	Weight int8
+}

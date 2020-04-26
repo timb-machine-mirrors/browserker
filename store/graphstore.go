@@ -3,6 +3,7 @@ package store
 import (
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/graph"
+	_ "github.com/cayleygraph/cayley/graph/kv/bolt"
 )
 
 type Graph struct {
@@ -20,7 +21,7 @@ func (g *Graph) Init() error {
 
 	// Initialize the database
 	err = graph.InitQuadStore(g.dbType, g.filepath, nil)
-	if err != nil {
+	if err != nil && err != graph.ErrDatabaseExists {
 		return err
 	}
 

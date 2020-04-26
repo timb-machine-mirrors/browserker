@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
 )
 
@@ -37,7 +36,6 @@ func (s *LocalLeaser) Acquire() (string, error) {
 
 	b.AddFlags(startupFlags)
 	if err := b.StartProcess(chrome, profileDir, port); err != nil {
-		log.Error().Err(err).Msg("failed to start browser")
 		return "", err
 	}
 	s.browserLock.Lock()
