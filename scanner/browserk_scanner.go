@@ -35,6 +35,7 @@ func (b *Browserk) Init() error {
 	if err := b.attackGraph.Init(); err != nil {
 		return err
 	}
+
 	log.Logger.Info().Msg("initializing crawl graph")
 	if err := b.crawlGraph.Init(); err != nil {
 		return err

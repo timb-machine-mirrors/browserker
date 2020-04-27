@@ -2,6 +2,7 @@ package navi
 
 type ElementType int16
 
+// revive:disable:var-naming
 const (
 	// Main Root
 	HTML ElementType = iota

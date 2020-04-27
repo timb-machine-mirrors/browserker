@@ -7,6 +7,6 @@ type CrawlStep func(ctx context.Context, browser Browser) (next CrawlStep, err e
 type Crawler interface {
 	Init() error
 	Start() error
-	GoTo(next CrawlStep) (CrawlStep, error)
+	GoTo(next *CrawlStep) (*CrawlStep, error)
 	Stop() error
 }

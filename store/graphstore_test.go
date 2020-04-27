@@ -14,6 +14,9 @@ func TestInit(t *testing.T) {
 		t.Fatalf("error opening testdir: %s\n", err)
 	}
 	defer os.RemoveAll(dir)
-	s := store.NewGraph("bolt", dir)
+	s, err := store.InitGraph("bolt", dir)
+	if err != nil {
+		t.Fatalf("error init graph: %s\n", err)
+	}
 	s.Close()
 }

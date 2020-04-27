@@ -7,8 +7,10 @@ import (
 	"gitlab.com/browserker/browserker/navi"
 )
 
+// ActionType defines the action type for a browser action
 type ActionType int8
 
+// revive:disable:var-naming
 const (
 	LOAD_URL ActionType = iota
 	EXECUTE_JS
@@ -30,17 +32,20 @@ const (
 	WAIT
 )
 
+// Action runs a browser action
 type Action struct {
 	browser   Browser
 	Type      ActionType
 	Input     []byte
 	Result    []byte
-	Responses map[int64]*HttpResponse
+	Responses map[int64]*HTTPResponse
 }
 
+// BrowserOpts todo: define
 type BrowserOpts struct {
 }
 
+// Browser interface
 type Browser interface {
 	ID() int64
 	// Load a web page
@@ -49,8 +54,8 @@ type Browser interface {
 	Instrument(opt *BrowserOpts) error
 	InjectBefore(ctx context.Context, inject inject.Injector) error
 	InjectAfter(ctx context.Context, inject inject.Injector) ([]byte, error)
-	GetResponses() (map[int64]*HttpResponse, error)
-	GetRequest() (HttpRequest, error)
+	GetResponses() (map[int64]*HTTPResponse, error)
+	GetRequest() (HTTPRequest, error)
 	Screenshot(ctx context.Context) ([]byte, error)
 	Execute(ctx context.Context, act map[int]*Action) error
 	ExecuteSingle(ctx context.Context, act *Action) error

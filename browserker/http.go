@@ -2,13 +2,13 @@ package browserker
 
 import "github.com/wirepair/gcd/gcdapi"
 
-type HttpRequest struct {
+type HTTPRequest struct {
 	gcdapi.NetworkRequest
 	requestID string
 	browserID string
 }
 
-type HttpResponse struct {
+type HTTPResponse struct {
 	gcdapi.NetworkResponse
-	request HttpRequest
+	request HTTPRequest
 }

@@ -14,13 +14,13 @@ func New() *Reporter {
 	return &Reporter{reports: make(map[string]map[string]*browserker.Report, 0)}
 }
 
-func (r *Reporter) AddReport(vulnID string, report *browserker.Report) {
-	key := report.VulnID + report.Evidence.GetHash()
-	if _, exist := r.reports[vulnID]; exist {
-		r.reports[vulnID][key] = report
+func (r *Reporter) Add(report *browserker.Report) {
+	key := report.VulnID + report.Evidence.Hash()
+	if _, exist := r.reports[report.VulnID]; exist {
+		r.reports[report.VulnID][key] = report
 	}
-	r.reports[vulnID] = make(map[string]*browserker.Report)
-	r.reports[vulnID][key] = report
+	r.reports[report.VulnID] = make(map[string]*browserker.Report)
+	r.reports[report.VulnID][key] = report
 }
 
 func (r *Reporter) Print(writer io.Writer) {

@@ -6,6 +6,7 @@ type Credentials struct {
 	Email    string
 }
 
+// AuthType defines how we are going to authenticate
 type AuthType int8
 
 const (
