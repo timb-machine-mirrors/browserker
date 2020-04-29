@@ -18,3 +18,11 @@ func (g *AttackGraph) Init() error {
 	g.Store, err = InitGraph(g.dbType, g.filepath)
 	return err
 }
+
+func (g *AttackGraph) AddAttack() {
+
+}
+
+func (g *AttackGraph) Close() error {
+	return Close(g.Store)
+}

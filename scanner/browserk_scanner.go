@@ -6,20 +6,19 @@ import (
 	"gitlab.com/browserker/browserker"
 	"gitlab.com/browserker/scanner/browser"
 	"gitlab.com/browserker/scanner/report"
-	"gitlab.com/browserker/store"
 )
 
 // Browserk is our engine
 type Browserk struct {
 	cfg         *browserker.Config
-	attackGraph store.Storer
-	crawlGraph  store.Storer
+	attackGraph browserker.AttackGrapher
+	crawlGraph  browserker.CrawlGrapher
 	reporter    browserker.Reporter
 	browsers    browser.BrowserPool
 }
 
 // New engine
-func New(cfg *browserker.Config, attack, crawl store.Storer) *Browserk {
+func New(cfg *browserker.Config, crawl browserker.CrawlGrapher, attack browserker.AttackGrapher) *Browserk {
 	return &Browserk{cfg: cfg, attackGraph: attack, crawlGraph: crawl, reporter: report.New()}
 }
 

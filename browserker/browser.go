@@ -12,7 +12,7 @@ type ActionType int8
 
 // revive:disable:var-naming
 const (
-	LOAD_URL ActionType = iota
+	LOAD_URL ActionType = iota + 1
 	EXECUTE_JS
 	LEFTCLICK
 	LEFTCLICK_DOWN
@@ -30,15 +30,18 @@ const (
 	HOVER
 	FOCUS
 	WAIT
+
+	// ActionTypes that occured automatically
+	REDIRECT
+	SUB_REQUEST
 )
 
 // Action runs a browser action
 type Action struct {
-	browser   Browser
-	Type      ActionType
-	Input     []byte
-	Result    []byte
-	Responses map[int64]*HTTPResponse
+	browser Browser
+	Type    ActionType `quad:"type"`
+	Input   []byte     `quad:"input"`
+	Result  []byte     `quad:"input"`
 }
 
 // BrowserOpts todo: define

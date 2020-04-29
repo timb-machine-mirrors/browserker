@@ -3,9 +3,12 @@ package store
 import (
 	"github.com/cayleygraph/cayley"
 	"github.com/cayleygraph/cayley/graph"
+
+	// required by cayley for registering stores of diff types
 	_ "github.com/cayleygraph/cayley/graph/kv/bolt"
 )
 
+// InitGraph or open existing
 func InitGraph(dbType, filepath string) (*cayley.Handle, error) {
 	var err error
 
@@ -21,4 +24,9 @@ func InitGraph(dbType, filepath string) (*cayley.Handle, error) {
 		return nil, err
 	}
 	return store, nil
+}
+
+// Close the db handle
+func Close(handle *cayley.Handle) error {
+	return handle.Close()
 }

@@ -43,8 +43,8 @@ func Crawler(ctx *cli.Context) error {
 		},
 		NumBrowsers: 3,
 	}
-	crawl := store.NewGraph("bolt", ctx.String("datadir")+"/crawl")
-	attack := store.NewGraph("bolt", ctx.String("datadir")+"/attack")
+	crawl := store.NewCrawlGraph("bolt", ctx.String("datadir")+"/crawl")
+	attack := store.NewAttackGraph("bolt", ctx.String("datadir")+"/attack")
 	browserk := scanner.New(cfg, crawl, attack)
 	log.Logger.Info().Msg("Starting browserker")
 
