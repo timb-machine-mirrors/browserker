@@ -43,6 +43,16 @@ func Encode(val reflect.Value, index int) ([]byte, error) {
 	return msgpack.Marshal(val.Field(index).Interface())
 }
 
+// EncodeState value
+func EncodeState(state browserker.NavState) ([]byte, error) {
+	return msgpack.Marshal(state)
+}
+
+// EncodeTime usually Now
+func EncodeTime(t time.Time) ([]byte, error) {
+	return msgpack.Marshal(t)
+}
+
 // DecodeNavigation takes a transaction and a nodeID and returns a navigation object or err
 func DecodeNavigation(txn *badger.Txn, predicates []*NavGraphField, nodeID []byte) (*browserker.Navigation, error) {
 	nav := &browserker.Navigation{}
@@ -69,7 +79,7 @@ func DecodeNavigation(txn *badger.Txn, predicates []*NavGraphField, nodeID []byt
 }
 
 // DecodeNavigationItem of the predicate value into the navigation object.
-// TODO maybe autogenerate this
+// TODO autogenerate this
 func DecodeNavigationItem(item *badger.Item, nav *browserker.Navigation, pred string) error {
 	var err error
 	switch pred {
@@ -77,7 +87,7 @@ func DecodeNavigationItem(item *badger.Item, nav *browserker.Navigation, pred st
 		err = item.Value(func(val []byte) error {
 			var b []byte
 			err := msgpack.Unmarshal(val, &b)
-			nav.NavigationID = b
+			nav.ID = b
 			return err
 		})
 	case "origin":
@@ -85,13 +95,6 @@ func DecodeNavigationItem(item *badger.Item, nav *browserker.Navigation, pred st
 			var b []byte
 			err := msgpack.Unmarshal(val, &b)
 			nav.OriginID = b
-			return err
-		})
-	case "request_id":
-		err = item.Value(func(val []byte) error {
-			var v int64
-			err := msgpack.Unmarshal(val, &v)
-			nav.RequestID = v
 			return err
 		})
 	case "trig_by":
@@ -115,6 +118,13 @@ func DecodeNavigationItem(item *badger.Item, nav *browserker.Navigation, pred st
 			nav.StateUpdatedTime = v
 			return err
 		})
+	case "dist":
+		err = item.Value(func(val []byte) error {
+			var v int
+			err := msgpack.Unmarshal(val, &v)
+			nav.Distance = v
+			return err
+		})
 	case "action":
 		err = item.Value(func(val []byte) error {
 			v := &browserker.Action{}
@@ -132,7 +142,7 @@ func DecodeState(val []byte) (browserker.NavState, error) {
 	var v int8
 	err := msgpack.Unmarshal(val, &v)
 	if err != nil {
-		return browserker.INVALID_STATE, err
+		return browserker.NavInvalid, err
 	}
 	return browserker.NavState(v), nil
 }

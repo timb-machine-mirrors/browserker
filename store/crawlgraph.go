@@ -5,8 +5,8 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/davecgh/go-spew/spew"
 	badger "github.com/dgraph-io/badger/v2"
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserker"
 )
@@ -17,15 +17,15 @@ type NavGraphField struct {
 }
 
 type CrawlGraph struct {
-	GraphStore   *badger.DB
-	RequestStore *badger.DB
-	filepath     string
-	predicates   []*NavGraphField
+	GraphStore    *badger.DB
+	RequestStore  *badger.DB
+	filepath      string
+	navPredicates []*NavGraphField
 }
 
 // NewCrawlGraph creates a new crawl graph and request store
 func NewCrawlGraph(filepath string) *CrawlGraph {
-	return &CrawlGraph{filepath: filepath, predicates: make([]*NavGraphField, 0)}
+	return &CrawlGraph{filepath: filepath}
 }
 
 // Init the crawl graph and request store
@@ -46,33 +46,35 @@ func (g *CrawlGraph) Init() error {
 		return err
 	}
 
-	g.discoverPredicates(&browserker.Navigation{})
+	g.navPredicates = g.discoverPredicates(&browserker.Navigation{})
 	return nil
 }
 
-func (g *CrawlGraph) discoverPredicates(nav *browserker.Navigation) {
-	rt := reflect.TypeOf(*nav)
+func (g *CrawlGraph) discoverPredicates(f interface{}) []*NavGraphField {
+	predicates := make([]*NavGraphField, 0)
+	rt := reflect.TypeOf(f).Elem()
 	for i := 0; i < rt.NumField(); i++ {
 		f := rt.Field(i)
 		fname := f.Tag.Get("graph")
 		if fname != "" {
-			g.predicates = append(g.predicates, &NavGraphField{
+			predicates = append(predicates, &NavGraphField{
 				index: i,
 				name:  fname,
 			})
 		}
 	}
+	return predicates
 }
 
 // AddNavigation entry into our graph and requests into request store
 func (g *CrawlGraph) AddNavigation(nav *browserker.Navigation) error {
 
 	return g.GraphStore.Update(func(txn *badger.Txn) error {
-		for i := 0; i < len(g.predicates); i++ {
-			key := MakeKey(nav.ID(), g.predicates[i].name)
+		for i := 0; i < len(g.navPredicates); i++ {
+			key := MakeKey(nav.ID, g.navPredicates[i].name)
 
 			rv := reflect.ValueOf(*nav)
-			bytez, err := Encode(rv, g.predicates[i].index)
+			bytez, err := Encode(rv, g.navPredicates[i].index)
 			if err != nil {
 				return err
 			}
@@ -89,7 +91,7 @@ func (g *CrawlGraph) GetNavigation(id []byte) (*browserker.Navigation, error) {
 	err := g.GraphStore.View(func(txn *badger.Txn) error {
 		var err error
 
-		exist, err = DecodeNavigation(txn, g.predicates, id)
+		exist, err = DecodeNavigation(txn, g.navPredicates, id)
 		return err
 	})
 	return exist, err
@@ -106,22 +108,36 @@ func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserker.NavS
 
 	entries := make([][]*browserker.Navigation, 0)
 	if byState == setState {
-		nodeIDs := make([][]byte, 0)
 		err := g.GraphStore.View(func(txn *badger.Txn) error {
-			var err error
-
-			nodeIDs, err = StateIterator(txn, byState, limit)
+			nodeIDs, err := StateIterator(txn, byState, limit)
 			if err != nil {
 				return err
 			}
-			entries, err = PathToNavIDs(txn, g.predicates, nodeIDs)
+			entries, err = PathToNavIDs(txn, g.navPredicates, nodeIDs)
 			return err
 		})
 
 		if err != nil {
 			log.Fatal().Err(err).Msg("failed to get path to navs")
 		}
-		spew.Dump(entries)
+	} else {
+		err := g.GraphStore.Update(func(txn *badger.Txn) error {
+			nodeIDs, err := StateIterator(txn, byState, limit)
+			if err != nil {
+				return err
+			}
+
+			err = UpdateState(txn, setState, nodeIDs)
+			if err != nil {
+				return err
+			}
+			entries, err = PathToNavIDs(txn, g.navPredicates, nodeIDs)
+			return errors.Wrap(err, "path to navs")
+		})
+
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to get path to navs")
+		}
 	}
 	return entries
 }
