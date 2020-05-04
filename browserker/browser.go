@@ -39,9 +39,9 @@ const (
 // Action runs a browser action
 type Action struct {
 	browser Browser
-	Type    ActionType `quad:"type"`
-	Input   []byte     `quad:"input"`
-	Result  []byte     `quad:"input"`
+	Type    ActionType `graph:"type"`
+	Input   []byte     `graph:"input"`
+	Result  []byte     `graph:"result"`
 }
 
 // BrowserOpts todo: define

@@ -1,7 +1,6 @@
 package store_test
 
 import (
-	"encoding/hex"
 	"os"
 	"testing"
 	"time"
@@ -12,7 +11,7 @@ import (
 )
 
 func TestCrawlGraph(t *testing.T) {
-	g := store.NewCrawlGraph("bolt", "testdata/crawl")
+	g := store.NewCrawlGraph("testdata/crawl")
 	if err := g.Init(); err != nil {
 		t.Fatalf("error init graph: %s\n", err)
 	}
@@ -20,11 +19,12 @@ func TestCrawlGraph(t *testing.T) {
 	defer os.RemoveAll("testdata/crawl")
 
 	nav := testMakeNavi([]byte{0, 1, 2})
-	nav.OriginID = hex.EncodeToString([]byte{0, 0, 0})
+	nav.OriginID = []byte{0, 0, 0}
 
 	if err := g.AddNavigation(nav); err != nil {
 		t.Fatalf("error adding: %s\n", err)
 	}
+
 	result, err := g.GetNavigation(nav.ID())
 	if err != nil {
 		t.Fatalf("error reading back navigation: %s\n", err)
@@ -48,7 +48,7 @@ func TestCrawlAddMultiple(t *testing.T) {
 	path := "testdata/multi/crawl"
 	os.RemoveAll(path)
 
-	g := store.NewCrawlGraph("bolt", path)
+	g := store.NewCrawlGraph(path)
 	if err := g.Init(); err != nil {
 		t.Fatalf("error init graph: %s\n", err)
 	}
@@ -56,21 +56,25 @@ func TestCrawlAddMultiple(t *testing.T) {
 
 	for i := 1; i < 11; i++ {
 		nav := testMakeNavi([]byte{0, byte(i), 2})
-		nav.OriginID = hex.EncodeToString([]byte{0, byte(i - 1), 0})
+		nav.OriginID = []byte{0, byte(i - 1), 2}
+
+		if i == 1 {
+			nav.OriginID = []byte{} // signals root
+		}
 
 		if err := g.AddNavigation(nav); err != nil {
 			t.Fatalf("error adding: %s\n", err)
 		}
 	}
 
-	_ = g.Find(nil, browserker.UNVISITED, browserker.INPROCESS, 5)
+	_ = g.Find(nil, browserker.UNVISITED, browserker.UNVISITED, 5)
 
 }
 
 func testMakeNavi(id []byte) *browserker.Navigation {
 	req := testMakeReq()
 	return &browserker.Navigation{
-		NavigationID: hex.EncodeToString(id),
+		NavigationID: id,
 		RequestID:    1,
 		DOM:          "blah",
 		LoadRequest: &browserker.HTTPRequest{

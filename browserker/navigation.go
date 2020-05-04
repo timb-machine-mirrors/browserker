@@ -3,8 +3,6 @@ package browserker
 import (
 	"crypto/md5"
 	"time"
-
-	"github.com/gobuffalo/packr/v2/file/resolver/encoding/hex"
 )
 
 type NavNode interface {
@@ -33,8 +31,9 @@ const (
 type NavState int8
 
 const (
+	INVALID_STATE NavState = iota + 1
 	// UNVISITED means it's ready for pick up by crawler
-	UNVISITED = iota + 1
+	UNVISITED
 	// INPROCESS crawler is in the process of crawling this
 	INPROCESS
 	// VISITED crawler has visited
@@ -45,13 +44,13 @@ const (
 
 // Navigation for storing the action and results of navigating
 type Navigation struct {
-	NavigationID     string      `quad:"@id"`    // cayley does not support []byte keys :|
-	OriginID         string      `quad:"origin"` // where this navigation node originated from
-	RequestID        int64       `quad:"nav_id"`
-	TriggeredBy      TriggeredBy `quad:"trig_by"`       // update to plugin/crawler/manual whatever type
-	State            NavState    `quad:"state"`         // state of this navigation
-	StateUpdatedTime time.Time   `quad:"state_updated"` // when the state was updated (for timeouts)
-	Action           *Action     `quad:"action"`
+	NavigationID     []byte      `graph:"id"`     // cayley does not support []byte keys :|
+	OriginID         []byte      `graph:"origin"` // where this navigation node originated from
+	RequestID        int64       `graph:"request_id"`
+	TriggeredBy      TriggeredBy `graph:"trig_by"`       // update to plugin/crawler/manual whatever type
+	State            NavState    `graph:"state"`         // state of this navigation
+	StateUpdatedTime time.Time   `graph:"state_updated"` // when the state was updated (for timeouts)
+	Action           *Action     `graph:"action"`
 
 	// todo maybe make a navigation result with these details?
 	DOM         string
@@ -66,11 +65,11 @@ func NewNavigation(triggeredBy TriggeredBy, action *Action) *Navigation {
 		Action:      action,
 		TriggeredBy: triggeredBy,
 	}
-	n.NavigationID = hex.EncodeToString(md5.New().Sum(append(n.Action.Input, byte(n.Action.Type))))
+	n.NavigationID = md5.New().Sum(append(n.Action.Input, byte(n.Action.Type)))
 	return n
 }
 
 // ID returns the hash of action input and type
-func (n *Navigation) ID() string {
-	return string(n.NavigationID)
+func (n *Navigation) ID() []byte {
+	return n.NavigationID
 }

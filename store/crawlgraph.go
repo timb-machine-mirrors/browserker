@@ -2,35 +2,30 @@ package store
 
 import (
 	"context"
-	"fmt"
 	"os"
+	"reflect"
 
-	"github.com/cayleygraph/cayley"
-	"github.com/cayleygraph/cayley/graph"
-	"github.com/cayleygraph/cayley/quad"
-	"github.com/cayleygraph/cayley/schema"
+	"github.com/davecgh/go-spew/spew"
 	badger "github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
-	uuid "github.com/satori/go.uuid"
 	"gitlab.com/browserker/browserker"
 )
 
-type NavEdge struct {
-	Prev quad.IRI
-	Next quad.IRI
+type NavGraphField struct {
+	index int
+	name  string
 }
 
 type CrawlGraph struct {
-	GraphStore   *cayley.Handle
+	GraphStore   *badger.DB
 	RequestStore *badger.DB
-	cfg          *schema.Config
 	filepath     string
-	dbType       string
+	predicates   []*NavGraphField
 }
 
 // NewCrawlGraph creates a new crawl graph and request store
-func NewCrawlGraph(dbType, filepath string) *CrawlGraph {
-	return &CrawlGraph{dbType: dbType, filepath: filepath}
+func NewCrawlGraph(filepath string) *CrawlGraph {
+	return &CrawlGraph{filepath: filepath, predicates: make([]*NavGraphField, 0)}
 }
 
 // Init the crawl graph and request store
@@ -46,105 +41,95 @@ func (g *CrawlGraph) Init() error {
 		return err
 	}
 
-	g.GraphStore, err = InitGraph(g.dbType, g.filepath)
-	g.cfg = schema.NewConfig()
-	g.cfg.GenerateID = func(_ interface{}) quad.Value {
-		return quad.IRI(uuid.NewV1().String())
+	g.GraphStore, err = badger.Open(badger.DefaultOptions(g.filepath + "/crawl"))
+	if err != nil {
+		return err
 	}
-	schema.RegisterType("nav", browserker.Navigation{})
-	return err
+
+	g.discoverPredicates(&browserker.Navigation{})
+	return nil
+}
+
+func (g *CrawlGraph) discoverPredicates(nav *browserker.Navigation) {
+	rt := reflect.TypeOf(*nav)
+	for i := 0; i < rt.NumField(); i++ {
+		f := rt.Field(i)
+		fname := f.Tag.Get("graph")
+		if fname != "" {
+			g.predicates = append(g.predicates, &NavGraphField{
+				index: i,
+				name:  fname,
+			})
+		}
+	}
 }
 
 // AddNavigation entry into our graph and requests into request store
 func (g *CrawlGraph) AddNavigation(nav *browserker.Navigation) error {
-	writer := graph.NewWriter(g.GraphStore)
-	id, err := g.cfg.WriteAsQuads(writer, nav)
-	writer.Close()
-	log.Logger.Info().Msgf("Wrote %s", id)
-	return err
+
+	return g.GraphStore.Update(func(txn *badger.Txn) error {
+		for i := 0; i < len(g.predicates); i++ {
+			key := MakeKey(nav.ID(), g.predicates[i].name)
+
+			rv := reflect.ValueOf(*nav)
+			bytez, err := Encode(rv, g.predicates[i].index)
+			if err != nil {
+				return err
+			}
+			// key = <id>:<predicate>, value = msgpack'd bytes
+			txn.Set(key, bytez)
+		}
+		return nil
+	})
 }
 
 // GetNavigation by the provided id value
-func (g *CrawlGraph) GetNavigation(id string) (*browserker.Navigation, error) {
+func (g *CrawlGraph) GetNavigation(id []byte) (*browserker.Navigation, error) {
 	exist := &browserker.Navigation{}
-	err := g.cfg.LoadTo(nil, g.GraphStore, exist, quad.IRI(id))
+	err := g.GraphStore.View(func(txn *badger.Txn) error {
+		var err error
+
+		exist, err = DecodeNavigation(txn, g.predicates, id)
+		return err
+	})
 	return exist, err
 }
 
 // Find navigation entries by a state. iff byState == setState will we not update the
-// state (and time stamp)
-func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserker.NavState, limit int64) map[string]*browserker.Navigation {
-	entries := make(map[string]*browserker.Navigation, 0)
-
-	p := cayley.StartPath(g.GraphStore).Has(quad.IRI("state"), quad.Int(byState)).Order()
-	if limit != 0 {
-		p.Limit(limit)
+// state (and time stamp) returns a slice of a slice of all navigations on how to get
+// to the final navigation state (TODO: Optimize with determining graph edges)
+func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserker.NavState, limit int64) [][]*browserker.Navigation {
+	// make sure limit is sane
+	if limit <= 0 || limit > 1000 {
+		limit = 1000
 	}
 
-	log.Info().Msg("calling iterate")
+	entries := make([][]*browserker.Navigation, 0)
+	if byState == setState {
+		nodeIDs := make([][]byte, 0)
+		err := g.GraphStore.View(func(txn *badger.Txn) error {
+			var err error
 
-	tx := cayley.NewTransaction()
-	ci := &iterateCtx{}
-	ci.Add(g.GetIRIIterateFn(ci),
-		g.LoadNavigationIterateFn(ctx, ci, entries),
-		g.UpdateIterateIntFn(ci, tx, "state", int(byState), int(setState)),
-	)
+			nodeIDs, err = StateIterator(txn, byState, limit)
+			if err != nil {
+				return err
+			}
+			entries, err = PathToNavIDs(txn, g.predicates, nodeIDs)
+			return err
+		})
 
-	err := p.Iterate(ctx).EachValue(nil, ci.Next)
-	log.Info().Msg("calling iterate complete")
-
-	if err != nil {
-		log.Fatal().Err(err).Msg("blamo")
+		if err != nil {
+			log.Fatal().Err(err).Msg("failed to get path to navs")
+		}
+		spew.Dump(entries)
 	}
-
-	if err := g.GraphStore.ApplyTransaction(tx); err != nil {
-		log.Error().Err(err).Msg("tx failed")
-	}
-
-	it := g.GraphStore.QuadsAllIterator()
-	defer it.Close()
-	fmt.Println("\nquads:")
-	for it.Next(ctx) {
-		fmt.Println(g.GraphStore.Quad(it.Result()))
-	}
-	return nil
-}
-
-func (g *CrawlGraph) GetIRIIterateFn(c *iterateCtx) iterateFn {
-	return func(value quad.Value) {
-		log.Info().Msgf("IN FIRST ASSIGNING IRI")
-		nativeValue := quad.NativeOf(value) // this converts RDF values to normal Go types
-		c.IRI, _ = nativeValue.(quad.IRI)
-		c.Value = value
-		c.Next(value)
-	}
-
-}
-
-func (g *CrawlGraph) UpdateIterateIntFn(c *iterateCtx, tx *graph.Transaction, field string, from, to int) iterateFn {
-	return func(value quad.Value) {
-		log.Info().Msgf("IN UPDATE READING IRI")
-		log.Info().Msgf("UPDATING %s", c.IRI.String())
-		tx.RemoveQuad(quad.Make(c.IRI, quad.IRI(field), quad.Int(from), nil))
-		tx.AddQuad(quad.Make(c.IRI, quad.IRI(field), quad.Int(to), nil))
-		c.Next(value)
-	}
-}
-
-func (g *CrawlGraph) LoadNavigationIterateFn(ctx context.Context, c *iterateCtx, entries map[string]*browserker.Navigation) iterateFn {
-	return func(value quad.Value) {
-		log.Info().Msgf("LOAD OBJ")
-		entry := &browserker.Navigation{}
-		g.cfg.LoadTo(ctx, g.GraphStore, entry, c.IRI)
-		entries[c.IRI.String()] = entry
-		c.Next(value)
-	}
+	return entries
 }
 
 // Close the graph and request stores
 func (g *CrawlGraph) Close() error {
 	err1 := g.RequestStore.Close()
-	err2 := Close(g.GraphStore)
+	err2 := g.GraphStore.Close()
 
 	if err2 != nil {
 		// print request store unable to close but just return the graph error
