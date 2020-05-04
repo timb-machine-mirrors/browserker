@@ -73,30 +73,30 @@ func (g *CrawlGraph) GetNavigation(id string) (*browserker.Navigation, error) {
 
 // Find navigation entries by a state. iff byState == setState will we not update the
 // state (and time stamp)
-func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserker.NavState) map[string]*browserker.Navigation {
-	//entries := make(map[string]*browserker.Navigation, 0)
-	p := cayley.StartPath(g.GraphStore).Has(quad.IRI("state"), quad.Int(byState)) // (quad.IRI("state")) .Out(quad.IRI("origin"))
-	//spew.Dump(p)
+func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserker.NavState, limit int64) map[string]*browserker.Navigation {
+	entries := make(map[string]*browserker.Navigation, 0)
+
+	p := cayley.StartPath(g.GraphStore).Has(quad.IRI("state"), quad.Int(byState)).Order()
+	if limit != 0 {
+		p.Limit(limit)
+	}
+
 	log.Info().Msg("calling iterate")
-	vs := make([]quad.IRI, 0)
 
-	err := p.Iterate(ctx).EachValue(nil, func(value quad.Value) {
-		nativeValue := quad.NativeOf(value) // this converts RDF values to normal Go types
-		log.Info().Msgf("in iterate %v", nativeValue)
-		iri, _ := nativeValue.(quad.IRI)
+	tx := cayley.NewTransaction()
+	ci := &iterateCtx{}
+	ci.Add(g.GetIRIIterateFn(ci),
+		g.LoadNavigationIterateFn(ctx, ci, entries),
+		g.UpdateIterateIntFn(ci, tx, "state", int(byState), int(setState)),
+	)
 
-		vs = append(vs, iri)
-	})
+	err := p.Iterate(ctx).EachValue(nil, ci.Next)
 	log.Info().Msg("calling iterate complete")
 
 	if err != nil {
 		log.Fatal().Err(err).Msg("blamo")
 	}
-	tx := cayley.NewTransaction()
-	for _, iri := range vs {
-		tx.RemoveQuad(quad.Make(iri, quad.IRI("state"), quad.Int(byState), nil))
-		tx.AddQuad(quad.Make(iri, quad.IRI("state"), quad.Int(setState), nil))
-	}
+
 	if err := g.GraphStore.ApplyTransaction(tx); err != nil {
 		log.Error().Err(err).Msg("tx failed")
 	}
@@ -107,8 +107,38 @@ func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserker.NavS
 	for it.Next(ctx) {
 		fmt.Println(g.GraphStore.Quad(it.Result()))
 	}
-
 	return nil
+}
+
+func (g *CrawlGraph) GetIRIIterateFn(c *iterateCtx) iterateFn {
+	return func(value quad.Value) {
+		log.Info().Msgf("IN FIRST ASSIGNING IRI")
+		nativeValue := quad.NativeOf(value) // this converts RDF values to normal Go types
+		c.IRI, _ = nativeValue.(quad.IRI)
+		c.Value = value
+		c.Next(value)
+	}
+
+}
+
+func (g *CrawlGraph) UpdateIterateIntFn(c *iterateCtx, tx *graph.Transaction, field string, from, to int) iterateFn {
+	return func(value quad.Value) {
+		log.Info().Msgf("IN UPDATE READING IRI")
+		log.Info().Msgf("UPDATING %s", c.IRI.String())
+		tx.RemoveQuad(quad.Make(c.IRI, quad.IRI(field), quad.Int(from), nil))
+		tx.AddQuad(quad.Make(c.IRI, quad.IRI(field), quad.Int(to), nil))
+		c.Next(value)
+	}
+}
+
+func (g *CrawlGraph) LoadNavigationIterateFn(ctx context.Context, c *iterateCtx, entries map[string]*browserker.Navigation) iterateFn {
+	return func(value quad.Value) {
+		log.Info().Msgf("LOAD OBJ")
+		entry := &browserker.Navigation{}
+		g.cfg.LoadTo(ctx, g.GraphStore, entry, c.IRI)
+		entries[c.IRI.String()] = entry
+		c.Next(value)
+	}
 }
 
 // Close the graph and request stores

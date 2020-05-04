@@ -41,7 +41,7 @@ func TestCrawlGraph(t *testing.T) {
 	if nav.Action.Type != result.Action.Type {
 		t.Fatalf("%v != %v\n", nav.Action.Type, result.Action.Type)
 	}
-	_ = g.Find(nil, browserker.UNVISITED, browserker.INPROCESS)
+	_ = g.Find(nil, browserker.UNVISITED, browserker.INPROCESS, 5)
 }
 
 func TestCrawlAddMultiple(t *testing.T) {
@@ -63,7 +63,7 @@ func TestCrawlAddMultiple(t *testing.T) {
 		}
 	}
 
-	_ = g.Find(nil, browserker.UNVISITED, browserker.INPROCESS)
+	_ = g.Find(nil, browserker.UNVISITED, browserker.INPROCESS, 5)
 
 }
 
