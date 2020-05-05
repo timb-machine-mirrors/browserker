@@ -16,6 +16,7 @@ type LocalLeaser struct {
 	browsers       map[string]*gcd.Gcd
 	browserTimeout time.Duration
 	tmp            string
+	chromeLocation string
 }
 
 // NewLocalLeaser for browsers
@@ -25,6 +26,7 @@ func NewLocalLeaser() *LocalLeaser {
 		browserTimeout: time.Second * 30,
 		browsers:       make(map[string]*gcd.Gcd),
 	}
+	s.chromeLocation, s.tmp = FindChrome()
 	return s
 }
 
@@ -33,13 +35,11 @@ func (s *LocalLeaser) Acquire() (string, error) {
 	b := gcd.NewChromeDebugger()
 	b.DeleteProfileOnExit()
 
-	chrome, tmp := FindChrome()
-	profileDir := randProfile(tmp)
-	s.tmp = tmp
+	profileDir := randProfile(s.tmp)
 	port := randPort()
-
+	log.Info().Msgf("chrome temp %s path: %s", s.tmp, profileDir)
 	b.AddFlags(startupFlags)
-	if err := b.StartProcess(chrome, profileDir, port); err != nil {
+	if err := b.StartProcess(s.chromeLocation, profileDir, port); err != nil {
 		return "", err
 	}
 	s.browserLock.Lock()
@@ -78,6 +78,7 @@ func (s *LocalLeaser) Cleanup() (string, error) {
 	if err := KillOldProcesses(); err != nil {
 		return "", err
 	}
+
 	if s.tmp == "" {
 		log.Fatal().Msg("tmp directory is empty! this could have deleted system files, exiting")
 	}

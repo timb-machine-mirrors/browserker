@@ -66,6 +66,7 @@ func KillOldProcesses() error {
 	if err != nil {
 		log.Warn().Msgf("google-chrome %s:%s", err.Error(), string(output))
 	}
+
 	killer = FindKill("chrome")
 	cmd = exec.Command(killer[0], killer[1:]...)
 	output, err = cmd.CombinedOutput()

@@ -19,7 +19,7 @@ func FindChrome() (string, string) {
 func FindKill(browser string) []string {
 	switch runtime.GOOS {
 	case "windows":
-		return []string{"taskkill", "/IM", browser + ".exe"}
+		return []string{"taskkill", "/F", "/IM", browser + ".exe"}
 	case "darwin", "linux":
 		return []string{"killall", browser}
 	}

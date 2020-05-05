@@ -31,6 +31,8 @@ func TestStartBrowsers(t *testing.T) {
 	if err := pool.Init(); err != nil {
 		t.Fatalf("failed to init pool")
 	}
+	defer leaser.Cleanup()
+
 	ctx := context.Background()
 	b, err := pool.Take(ctx)
 	if err != nil {

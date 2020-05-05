@@ -88,9 +88,6 @@ func (b *GCDBrowserPool) UseDisplay(display string) {
 
 // Init starts the browser/Browser pool
 func (b *GCDBrowserPool) Init() error {
-	if _, err := b.leaser.Cleanup(); err != nil {
-		return err
-	}
 	return b.Start()
 }
 
@@ -106,7 +103,7 @@ func (b *GCDBrowserPool) Start() error {
 	defer cancel()
 	// clean up just in case we are restarting
 	if _, err := b.leaser.Cleanup(); err != nil {
-		panic("failed to clean up browsers")
+		panic(fmt.Sprintf("failed to clean up browsers %s", err))
 	}
 
 	log.Info().Int("browsers", b.maxBrowsers).Msg("creating browsers")
