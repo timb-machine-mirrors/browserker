@@ -84,7 +84,7 @@ func (t *Tab) subscribeSetChildNodes() {
 		err := json.Unmarshal(payload, header)
 		if err == nil {
 			event := header.Params
-			t.dispatchNodeChange(&NodeChangeEvent{EventType: SetChildNodesEvent, Nodes: event.Nodes, ParentNodeId: event.ParentId})
+			t.dispatchNodeChange(&NodeChangeEvent{EventType: SetChildNodesEvent, Nodes: event.Nodes, ParentNodeID: event.ParentId})
 
 		}
 	})
@@ -96,7 +96,7 @@ func (t *Tab) subscribeAttributeModified() {
 		err := json.Unmarshal(payload, header)
 		if err == nil {
 			event := header.Params
-			t.dispatchNodeChange(&NodeChangeEvent{EventType: AttributeModifiedEvent, Name: event.Name, Value: event.Value, NodeId: event.NodeId})
+			t.dispatchNodeChange(&NodeChangeEvent{EventType: AttributeModifiedEvent, Name: event.Name, Value: event.Value, NodeID: event.NodeId})
 		}
 	})
 }
@@ -107,7 +107,7 @@ func (t *Tab) subscribeAttributeRemoved() {
 		err := json.Unmarshal(payload, header)
 		if err == nil {
 			event := header.Params
-			t.dispatchNodeChange(&NodeChangeEvent{EventType: AttributeRemovedEvent, NodeId: event.NodeId, Name: event.Name})
+			t.dispatchNodeChange(&NodeChangeEvent{EventType: AttributeRemovedEvent, NodeID: event.NodeId, Name: event.Name})
 		}
 	})
 }
@@ -117,7 +117,7 @@ func (t *Tab) subscribeCharacterDataModified() {
 		err := json.Unmarshal(payload, header)
 		if err == nil {
 			event := header.Params
-			t.dispatchNodeChange(&NodeChangeEvent{EventType: CharacterDataModifiedEvent, NodeId: event.NodeId, CharacterData: event.CharacterData})
+			t.dispatchNodeChange(&NodeChangeEvent{EventType: CharacterDataModifiedEvent, NodeID: event.NodeId, CharacterData: event.CharacterData})
 		}
 	})
 }
@@ -127,7 +127,7 @@ func (t *Tab) subscribeChildNodeCountUpdated() {
 		err := json.Unmarshal(payload, header)
 		if err == nil {
 			event := header.Params
-			t.dispatchNodeChange(&NodeChangeEvent{EventType: ChildNodeCountUpdatedEvent, NodeId: event.NodeId, ChildNodeCount: event.ChildNodeCount})
+			t.dispatchNodeChange(&NodeChangeEvent{EventType: ChildNodeCountUpdatedEvent, NodeID: event.NodeId, ChildNodeCount: event.ChildNodeCount})
 		}
 	})
 }
@@ -138,7 +138,7 @@ func (t *Tab) subscribeChildNodeInserted() {
 		err := json.Unmarshal(payload, header)
 		if err == nil {
 			event := header.Params
-			t.dispatchNodeChange(&NodeChangeEvent{EventType: ChildNodeInsertedEvent, Node: event.Node, ParentNodeId: event.ParentNodeId, PreviousNodeId: event.PreviousNodeId})
+			t.dispatchNodeChange(&NodeChangeEvent{EventType: ChildNodeInsertedEvent, Node: event.Node, ParentNodeID: event.ParentNodeId, PreviousNodeID: event.PreviousNodeId})
 		}
 	})
 }
@@ -148,7 +148,7 @@ func (t *Tab) subscribeChildNodeRemoved() {
 		err := json.Unmarshal(payload, header)
 		if err == nil {
 			event := header.Params
-			t.dispatchNodeChange(&NodeChangeEvent{EventType: ChildNodeRemovedEvent, ParentNodeId: event.ParentNodeId, NodeId: event.NodeId})
+			t.dispatchNodeChange(&NodeChangeEvent{EventType: ChildNodeRemovedEvent, ParentNodeID: event.ParentNodeId, NodeID: event.NodeId})
 		}
 	})
 }

@@ -1,6 +1,8 @@
 package clicmds
 
 import (
+	"context"
+
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"gitlab.com/browserker/browserk"
@@ -48,7 +50,8 @@ func Crawler(ctx *cli.Context) error {
 	browserk := scanner.New(cfg, crawl, attack)
 	log.Logger.Info().Msg("Starting browserker")
 
-	if err := browserk.Init(); err != nil {
+	scanContext := context.Background()
+	if err := browserk.Init(scanContext); err != nil {
 		log.Logger.Error().Err(err).Msg("failed to init engine")
 		return err
 	}

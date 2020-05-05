@@ -8,7 +8,6 @@ import (
 
 	"gitlab.com/browserker/browserk"
 	"gitlab.com/browserker/scanner/browser"
-	"gitlab.com/browserker/scanner/crawler"
 	"gitlab.com/browserker/scanner/report"
 )
 
@@ -18,7 +17,7 @@ type Browserk struct {
 	attackGraph browserk.AttackGrapher
 	crawlGraph  browserk.CrawlGrapher
 	reporter    browserk.Reporter
-	browsers    browser.BrowserPool
+	browsers    browserk.BrowserPool
 
 	scanContext  context.Context
 	stateMonitor *time.Ticker
@@ -70,7 +69,7 @@ func (b *Browserk) Start() error {
 			// TODO: check graph for inprocess values that never made it
 			log.Info().Msg("state monitor ping")
 		default:
-			entries := b.crawlGraph.Find(b.scanContext, browserk.NavUnvisited, browserk.NavInProcess, b.cfg.NumBrowsers)
+			_ = b.crawlGraph.Find(b.scanContext, browserk.NavUnvisited, browserk.NavInProcess, int64(b.cfg.NumBrowsers))
 
 		}
 	}
@@ -78,23 +77,25 @@ func (b *Browserk) Start() error {
 }
 
 func (b *Browserk) processEntries(entries [][]*browserk.Navigation) {
-	for i, navs := range entries {
-		browser, err := b.browsers.Take(ctx)
-		if err != nil {
-			return
-		}
-		crawler := crawler.New(b.cfg)
-		if err := crawler.Init(); err != nil {
-			return err
-		}
+	/*
+		for i, navs := range entries {
+			browser, err := b.browsers.Take(b.scanContext)
+			if err != nil {
+				return
+			}
+			crawler := crawler.New(b.cfg)
+			if err := crawler.Init(); err != nil {
+				return err
+			}
 
-		for j, nav := range navs {
-			ctx, cancel := context.WithTimeout(b.scanContext, time.Second*45)
-			defer cancel()
-			results, newEntries, err := crawler.Process(ctx, browser, nav)
-		}
+			for j, nav := range navs {
+				ctx, cancel := context.WithTimeout(b.scanContext, time.Second*45)
+				defer cancel()
+				results, newEntries, err := crawler.Process(ctx, browser, nav)
+			}
 
-	}
+		}
+	*/
 }
 
 // Stop the browsers

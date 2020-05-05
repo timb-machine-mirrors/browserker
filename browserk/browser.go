@@ -44,6 +44,11 @@ type Action struct {
 	Result  []byte     `graph:"result"`
 }
 
+type BrowserPool interface {
+	Take(ctx context.Context) (Browser, error)
+	Return(ctx context.Context, browserPort string)
+}
+
 // BrowserOpts todo: define
 type BrowserOpts struct {
 }
@@ -53,13 +58,13 @@ type Browser interface {
 	ID() int64
 	// Navigate to a web page
 	Navigate(ctx context.Context, url string) (err error)
-	Find(ctx context.Context, finder navi.Find) (navi.Element, error)
+	Find(ctx context.Context, finder navi.Find) (*navi.Element, error)
 	Instrument(opt *BrowserOpts) error
 	InjectBefore(ctx context.Context, inject inject.Injector) error
 	InjectAfter(ctx context.Context, inject inject.Injector) ([]byte, error)
 	GetResponses() (map[int64]*HTTPResponse, error)
-	GetRequest() (HTTPRequest, error)
-	Screenshot(ctx context.Context) ([]byte, error)
+	GetRequest() (*HTTPRequest, error)
+	Screenshot(ctx context.Context) (string, error)
 	Execute(ctx context.Context, act map[int]*Action) error
 	ExecuteSingle(ctx context.Context, act *Action) error
 }

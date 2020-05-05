@@ -15,6 +15,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
+	"gitlab.com/browserker/browserk"
+	"gitlab.com/browserker/browserk/inject"
+	"gitlab.com/browserker/browserk/navi"
 
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
@@ -22,8 +25,10 @@ import (
 
 // Tab is a chromium browser tab we use for instrumentation
 type Tab struct {
+	g                     *gcd.Gcd
 	t                     *gcd.ChromeTarget
 	container             *ResponseContainer
+	id                    int64
 	eleMutex              *sync.RWMutex          // locks our elements when added/removed.
 	elements              map[int]*Element       // our map of elements for this tab
 	topNodeID             atomic.Value           // the nodeID of the current top level #document
@@ -47,7 +52,7 @@ type Tab struct {
 }
 
 // NewTab to use
-func NewTab(ctx context.Context, tab *gcd.ChromeTarget) *Tab {
+func NewTab(ctx context.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Tab {
 	t := &Tab{
 		t:            tab,
 		container:    NewResponseContainer(),
@@ -55,6 +60,8 @@ func NewTab(ctx context.Context, tab *gcd.ChromeTarget) *Tab {
 		exitCh:       make(chan struct{}),
 		navigationCh: make(chan int),
 	}
+	t.id = browserk.GetBrowserID()
+	t.g = gcdBrowser
 	t.eleMutex = &sync.RWMutex{}
 	t.elements = make(map[int]*Element)
 	t.nodeChange = make(chan *NodeChangeEvent)
@@ -103,6 +110,42 @@ func (t *Tab) Navigate(ctx context.Context, url string) error {
 	err = t.WaitReady(ctx, time.Second*9)
 	//log.Ctx(ctx).Info().Msg("wait ready returned")
 	return err
+}
+
+func (t *Tab) ID() int64 {
+	return t.id
+}
+
+func (t *Tab) Find(ctx context.Context, finder navi.Find) (*navi.Element, error) {
+	return nil, nil
+}
+
+func (t *Tab) Instrument(opt *browserk.BrowserOpts) error {
+	return nil
+}
+
+func (t *Tab) InjectBefore(ctx context.Context, inject inject.Injector) error {
+	return nil
+}
+
+func (t *Tab) InjectAfter(ctx context.Context, inject inject.Injector) ([]byte, error) {
+	return nil, nil
+}
+
+func (t *Tab) GetResponses() (map[int64]*browserk.HTTPResponse, error) {
+	return nil, nil
+}
+
+func (t *Tab) GetRequest() (*browserk.HTTPRequest, error) {
+	return nil, nil
+}
+
+func (t *Tab) Execute(ctx context.Context, act map[int]*browserk.Action) error {
+	return nil
+}
+
+func (t *Tab) ExecuteSingle(ctx context.Context, act *browserk.Action) error {
+	return nil
 }
 
 // InjectJS only caller knows what the response type will be so return an interface{}
@@ -598,8 +641,8 @@ func (t *Tab) GetDocumentCurrentUrl(docNodeID int) (string, error) {
 	return docNode.node.DocumentURL, nil
 }
 
-// TakeScreenshot returns a png image, base64 encoded, or error if failed
-func (t *Tab) TakeScreenshot(ctx context.Context) (string, error) {
+// Screenshot returns a png image, base64 encoded, or error if failed
+func (t *Tab) Screenshot(ctx context.Context) (string, error) {
 	params := &gcdapi.PageCaptureScreenshotParams{
 		Format:  "png",
 		Quality: 100,

@@ -16,7 +16,7 @@ require (
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	github.com/wirepair/gcd v1.0.9
-	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0 // indirect
+	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
 	golang.org/x/sys v0.0.0-20200428200454-593003d681fa // indirect
 	gopkg.in/yaml.v2 v2.2.8 // indirect
 )

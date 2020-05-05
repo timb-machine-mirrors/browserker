@@ -5,7 +5,6 @@ type Selector struct {
 	Other string
 }
 
-// revive:disable:var-naming
 type Find func(s *Selector) (*Element, error)
 
 type By int8

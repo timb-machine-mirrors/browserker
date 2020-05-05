@@ -13,11 +13,6 @@ import (
 	"gitlab.com/browserker/browserk"
 )
 
-type BrowserPool interface {
-	Take(ctx context.Context) (browserk.Browser, error)
-	Return(ctx context.Context, browser browserk.Browser)
-}
-
 var startupFlags = []string{
 	//"--allow-insecure-localhost",
 	"--enable-automation",
@@ -121,7 +116,7 @@ func (b *GCDBrowserPool) Start() error {
 	currentCount := atomic.LoadInt32(&b.startCount)
 	// always have 2 browsers ready
 	for i := 0; i < b.maxBrowsers; i++ {
-		b.returnBrowser(timeoutCtx, nil, currentCount) // passing nil will just create a new one for us
+		b.returnBrowser(timeoutCtx, "", currentCount) // passing an empty port will just create a new one for us
 		log.Info().Int("i", i).Msg("browser created")
 	}
 
@@ -135,11 +130,11 @@ func (b *GCDBrowserPool) Start() error {
 func (b *GCDBrowserPool) Acquire(ctx context.Context) *gcd.Gcd {
 
 	select {
-	case browser := <-b.browsers:
-		if browser != nil {
+	case br := <-b.browsers:
+		if br != nil {
 			atomic.AddInt32(&b.acquiredBrowsers, 1)
 		}
-		return browser
+		return br
 	case <-ctx.Done():
 		log.Warn().Err(ctx.Err()).Msg("failed to acquire Browser from pool")
 		atomic.AddInt32(&b.acquireErrors, 1)
@@ -178,12 +173,12 @@ EMPTY:
 }
 
 // Return a browser
-func (b *GCDBrowserPool) returnBrowser(ctx context.Context, browser *gcd.Gcd, startCount int32) {
+func (b *GCDBrowserPool) returnBrowser(ctx context.Context, port string, startCount int32) {
 	timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
 	defer cancel()
 	doneCh := make(chan struct{})
 
-	go b.closeAndCreateBrowser(browser, doneCh, startCount)
+	go b.closeAndCreateBrowser(port, doneCh, startCount)
 
 	select {
 	case <-timeoutCtx.Done():
@@ -195,9 +190,9 @@ func (b *GCDBrowserPool) returnBrowser(ctx context.Context, browser *gcd.Gcd, st
 
 // closeAndCreateBrowser takes an optional Browser to close, and creates a new one, closing doneCh
 // to signal it completed (although it may be a nil browser if error occurred).
-func (b *GCDBrowserPool) closeAndCreateBrowser(browser *gcd.Gcd, doneCh chan struct{}, startCount int32) {
-	if browser != nil {
-		if err := b.leaser.Return(browser.Port()); err != nil {
+func (b *GCDBrowserPool) closeAndCreateBrowser(port string, doneCh chan struct{}, startCount int32) {
+	if port != "" {
+		if err := b.leaser.Return(port); err != nil {
 			log.Error().Err(err).Msg("failed to return browser")
 		}
 		atomic.AddInt32(&b.acquiredBrowsers, -1)
@@ -210,7 +205,7 @@ func (b *GCDBrowserPool) closeAndCreateBrowser(browser *gcd.Gcd, doneCh chan str
 		return
 	}
 
-	browser = gcd.NewChromeDebugger()
+	newBr := gcd.NewChromeDebugger()
 	port, err := b.leaser.Acquire()
 	if err != nil {
 		log.Warn().Err(err).Msg("unable to acquire new browser")
@@ -219,36 +214,42 @@ func (b *GCDBrowserPool) closeAndCreateBrowser(browser *gcd.Gcd, doneCh chan str
 		return
 	}
 
-	if err := browser.ConnectToInstance("localhost", string(port)); err != nil {
+	if err := newBr.ConnectToInstance("localhost", string(port)); err != nil {
 		log.Warn().Err(err).Msg("failed to connect to instance")
-		browser = nil
+		newBr = nil
 	}
 
-	b.browsers <- browser
+	b.browsers <- newBr
 	close(doneCh)
 }
 
 // Take a browser, user is responsible for closing tabs they opened.
-func (b *GCDBrowserPool) Take(ctx context.Context) (*gcd.Gcd, error) {
-	var browser *gcd.Gcd
+func (b *GCDBrowserPool) Take(ctx context.Context) (browserk.Browser, error) {
+	var br *gcd.Gcd
 
 	if atomic.LoadInt32(&b.closing) == 1 {
 		return nil, ErrBrowserClosing
 	}
 	// if nil, do not return browser
-	if browser = b.Acquire(ctx); browser == nil {
+	if br = b.Acquire(ctx); br == nil {
 		return nil, errors.New("browser acquisition failed during Take")
 	}
 
 	log.Ctx(ctx).Info().Int32("acquired", atomic.LoadInt32(&b.acquiredBrowsers)).Int32("errors", atomic.LoadInt32(&b.acquireErrors)).Msg("acquired browser")
-	return browser, nil
+	t, err := br.GetFirstTab()
+	if err != nil {
+		b.Return(ctx, br.Port())
+		return nil, fmt.Errorf("failed to aquire valid tab from browser")
+	}
+	gtab := NewTab(ctx, br, t)
+	return gtab, nil
 }
 
 // Return a browser for destruction
-func (b *GCDBrowserPool) Return(ctx context.Context, browser *gcd.Gcd) {
+func (b *GCDBrowserPool) Return(ctx context.Context, browserPort string) {
 	startCount := atomic.LoadInt32(&b.startCount) // track if we've restarted so we can throw away bad browsers
 	log.Ctx(ctx).Info().Msg("closing browser")
-	b.returnBrowser(ctx, browser, startCount)
+	b.returnBrowser(ctx, browserPort, startCount)
 	return
 }
 
@@ -259,9 +260,9 @@ func (b *GCDBrowserPool) Close(ctx context.Context) error {
 	}
 
 	for {
-		browser := b.Acquire(ctx)
-		if browser != nil {
-			if err := b.leaser.Return(browser.Port()); err != nil {
+		br := b.Acquire(ctx)
+		if br != nil {
+			if err := b.leaser.Return(br.Port()); err != nil {
 				log.Error().Err(err).Msg("failed to return browser")
 			}
 		}
