@@ -37,5 +37,4 @@ func TestStartBrowsers(t *testing.T) {
 		t.Fatalf("error taking browser: %s\n", err)
 	}
 	b.Navigate(ctx, "http://example.com")
-	b.Screenshot()
 }

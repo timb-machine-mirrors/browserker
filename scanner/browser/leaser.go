@@ -32,6 +32,9 @@ func randPort() string {
 
 func randProfile(tmp string) string {
 	profile, err := ioutil.TempDir(tmp, "gcd")
+	if profile == "" {
+		log.Fatal().Msg("profile returned empty which could delete system files on termination")
+	}
 	if err != nil {
 		log.Error().Err(err).Msg("failed to create temporary profile directory")
 		return "tmp"

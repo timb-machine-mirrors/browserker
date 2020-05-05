@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
 )
 
@@ -76,6 +77,9 @@ func (s *LocalLeaser) Return(port string) error {
 func (s *LocalLeaser) Cleanup() (string, error) {
 	if err := KillOldProcesses(); err != nil {
 		return "", err
+	}
+	if s.tmp == "" {
+		log.Fatal().Msg("tmp directory is empty! this could have deleted system files, exiting")
 	}
 
 	if err := RemoveTmpContents(s.tmp); err != nil {
