@@ -51,6 +51,7 @@ var (
 	ErrTabClosing         = errors.New("closing")
 	ErrTimedOut           = errors.New("request timed out")
 	ErrNavigating         = errors.New("error in navigation")
+	ErrBrowserClosing     = errors.New("unable to load, as closing down")
 )
 
 // ElementNotFoundErr when we are unable to find an element/nodeID

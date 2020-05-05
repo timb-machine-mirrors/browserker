@@ -54,10 +54,7 @@ var startupFlags = []string{
 	"about:blank",
 }
 
-var (
-	ErrBrowserClosing = errors.New("unable to load, as closing down")
-)
-
+// GCDBrowserPool manages a pool of browsers via a leaser interface
 type GCDBrowserPool struct {
 	profileDir       string
 	maxBrowsers      int
@@ -72,6 +69,7 @@ type GCDBrowserPool struct {
 	logger           zerolog.Logger
 }
 
+// NewGCDBrowserPool number of pools, and a leaser that we can use
 func NewGCDBrowserPool(maxBrowsers int, leaser LeaserService) *GCDBrowserPool {
 	b := &GCDBrowserPool{}
 	b.maxBrowsers = maxBrowsers
@@ -101,6 +99,7 @@ func (b *GCDBrowserPool) Start() error {
 	// allow 3 seconds per Browser
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), time.Second*time.Duration(b.maxBrowsers*3))
 	defer cancel()
+
 	// clean up just in case we are restarting
 	if _, err := b.leaser.Cleanup(); err != nil {
 		panic(fmt.Sprintf("failed to clean up browsers %s", err))
@@ -272,10 +271,4 @@ func (b *GCDBrowserPool) Close(ctx context.Context) error {
 			return nil
 		}
 	}
-}
-
-// buildURL and signal the browser to inject IP address if we have an IP/Host pair
-// TODO: renable injecting IP once fixed/resolved...
-func (b *GCDBrowserPool) buildURL(tab *Tab, address, scheme, port string) string {
-	return address
 }

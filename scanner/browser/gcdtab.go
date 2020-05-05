@@ -112,6 +112,7 @@ func (t *Tab) Navigate(ctx context.Context, url string) error {
 	return err
 }
 
+// ID of this browser (tab)
 func (t *Tab) ID() int64 {
 	return t.id
 }
@@ -469,7 +470,7 @@ func (t *Tab) GetElementByNodeID(nodeID int) (*Element, bool) {
 	return newEle, false
 }
 
-// Returns the element given the x, y coordinates on the page, or returns error.
+// GetElementByLocation returns the element given the x, y coordinates on the page, or returns error.
 func (t *Tab) GetElementByLocation(x, y int) (*Element, error) {
 	_, _, nodeID, err := t.t.DOM.GetNodeForLocation(x, y, false, false)
 	if err != nil {
@@ -479,7 +480,7 @@ func (t *Tab) GetElementByLocation(x, y int) (*Element, error) {
 	return ele, nil
 }
 
-// Returns a copy of all currently known elements. Note that modifications to elements
+// GetAllElements returns a copy of all currently known elements. Note that modifications to elements
 // maybe unsafe.
 func (t *Tab) GetAllElements() map[int]*Element {
 	t.eleMutex.RLock()
@@ -491,13 +492,13 @@ func (t *Tab) GetAllElements() map[int]*Element {
 	return allElements
 }
 
-// Returns the element by searching the top level document for an element with attributeID
+// GetElementByID returns the element by searching the top level document for an element with attributeID
 // Does not work on frames.
 func (t *Tab) GetElementByID(attributeID string) (*Element, bool, error) {
 	return t.GetDocumentElementByID(t.GetTopNodeID(), attributeID)
 }
 
-// Returns an element from a specific Document.
+// GetDocumentElementByID returns an element from a specific Document.
 func (t *Tab) GetDocumentElementByID(docNodeID int, attributeID string) (*Element, bool, error) {
 	var err error
 
@@ -627,13 +628,13 @@ func (t *Tab) GetPageSource(docNodeID int) (string, error) {
 	return t.t.DOM.GetOuterHTMLWithParams(outerParams)
 }
 
-// GetCurrentUrl returns the current url of the top level document
-func (t *Tab) GetCurrentUrl() (string, error) {
-	return t.GetDocumentCurrentUrl(t.GetTopNodeID())
+// GetCurrentURL returns the current url of the top level document
+func (t *Tab) GetCurrentURL() (string, error) {
+	return t.GetDocumentCurrentURL(t.GetTopNodeID())
 }
 
-// GetDocumentCurrentUrl returns the current url of the provIDed docNodeID
-func (t *Tab) GetDocumentCurrentUrl(docNodeID int) (string, error) {
+// GetDocumentCurrentURL returns the current url of the provIDed docNodeID
+func (t *Tab) GetDocumentCurrentURL(docNodeID int) (string, error) {
 	docNode, ok := t.getElement(docNodeID)
 	if !ok {
 		return "", &ElementNotFoundErr{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
