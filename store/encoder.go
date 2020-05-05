@@ -7,7 +7,7 @@ import (
 
 	badger "github.com/dgraph-io/badger/v2"
 	"github.com/vmihailenco/msgpack/v4"
-	"gitlab.com/browserker/browserker"
+	"gitlab.com/browserker/browserk"
 )
 
 type PredicateField struct {
@@ -44,7 +44,7 @@ func Encode(val reflect.Value, index int) ([]byte, error) {
 }
 
 // EncodeState value
-func EncodeState(state browserker.NavState) ([]byte, error) {
+func EncodeState(state browserk.NavState) ([]byte, error) {
 	return msgpack.Marshal(state)
 }
 
@@ -54,8 +54,8 @@ func EncodeTime(t time.Time) ([]byte, error) {
 }
 
 // DecodeNavigation takes a transaction and a nodeID and returns a navigation object or err
-func DecodeNavigation(txn *badger.Txn, predicates []*NavGraphField, nodeID []byte) (*browserker.Navigation, error) {
-	nav := &browserker.Navigation{}
+func DecodeNavigation(txn *badger.Txn, predicates []*NavGraphField, nodeID []byte) (*browserk.Navigation, error) {
+	nav := &browserk.Navigation{}
 
 	fields := make([]PredicateField, len(predicates))
 	for i := 0; i < len(predicates); i++ {
@@ -80,7 +80,7 @@ func DecodeNavigation(txn *badger.Txn, predicates []*NavGraphField, nodeID []byt
 
 // DecodeNavigationItem of the predicate value into the navigation object.
 // TODO autogenerate this
-func DecodeNavigationItem(item *badger.Item, nav *browserker.Navigation, pred string) error {
+func DecodeNavigationItem(item *badger.Item, nav *browserk.Navigation, pred string) error {
 	var err error
 	switch pred {
 	case "id":
@@ -101,14 +101,14 @@ func DecodeNavigationItem(item *badger.Item, nav *browserker.Navigation, pred st
 		err = item.Value(func(val []byte) error {
 			var v int16
 			err := msgpack.Unmarshal(val, &v)
-			nav.TriggeredBy = browserker.TriggeredBy(v)
+			nav.TriggeredBy = browserk.TriggeredBy(v)
 			return err
 		})
 	case "state":
 		err = item.Value(func(val []byte) error {
 			var v int8
 			err := msgpack.Unmarshal(val, &v)
-			nav.State = browserker.NavState(v)
+			nav.State = browserk.NavState(v)
 			return err
 		})
 	case "state_updated":
@@ -127,7 +127,7 @@ func DecodeNavigationItem(item *badger.Item, nav *browserker.Navigation, pred st
 		})
 	case "action":
 		err = item.Value(func(val []byte) error {
-			v := &browserker.Action{}
+			v := &browserk.Action{}
 			err := msgpack.Unmarshal(val, &v)
 			nav.Action = v
 			return err
@@ -138,13 +138,13 @@ func DecodeNavigationItem(item *badger.Item, nav *browserker.Navigation, pred st
 	return err
 }
 
-func DecodeState(val []byte) (browserker.NavState, error) {
+func DecodeState(val []byte) (browserk.NavState, error) {
 	var v int8
 	err := msgpack.Unmarshal(val, &v)
 	if err != nil {
-		return browserker.NavInvalid, err
+		return browserk.NavInvalid, err
 	}
-	return browserker.NavState(v), nil
+	return browserk.NavState(v), nil
 }
 
 func DecodeID(val []byte) ([]byte, error) {

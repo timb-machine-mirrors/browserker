@@ -15,6 +15,7 @@ func FindChrome() (string, string) {
 	return "", ""
 }
 
+// FindKill based on OS
 func FindKill(browser string) []string {
 	switch runtime.GOOS {
 	case "windows":

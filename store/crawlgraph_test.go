@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/wirepair/gcd/gcdapi"
-	"gitlab.com/browserker/browserker"
+	"gitlab.com/browserker/browserk"
 	"gitlab.com/browserker/store"
 )
 
@@ -41,7 +41,7 @@ func TestCrawlGraph(t *testing.T) {
 	if nav.Action.Type != result.Action.Type {
 		t.Fatalf("%v != %v\n", nav.Action.Type, result.Action.Type)
 	}
-	_ = g.Find(nil, browserker.NavUnvisited, browserker.NavInProcess, 5)
+	_ = g.Find(nil, browserk.NavUnvisited, browserk.NavInProcess, 5)
 }
 
 func TestCrawlAddMultiple(t *testing.T) {
@@ -69,7 +69,7 @@ func TestCrawlAddMultiple(t *testing.T) {
 	}
 
 	limit := 5
-	entries := g.Find(nil, browserker.NavUnvisited, browserker.NavUnvisited, int64(limit))
+	entries := g.Find(nil, browserk.NavUnvisited, browserk.NavUnvisited, int64(limit))
 	if len(entries) != limit {
 		t.Fatalf("entries did not match limit got %d\n", len(entries))
 	}
@@ -86,27 +86,27 @@ func TestCrawlAddMultiple(t *testing.T) {
 		}
 	}
 
-	entries = g.Find(nil, browserker.NavUnvisited, browserker.NavInProcess, int64(limit))
+	entries = g.Find(nil, browserk.NavUnvisited, browserk.NavInProcess, int64(limit))
 	if len(entries) != limit {
 		t.Fatalf("entries did not match limit got %d\n", len(entries))
 	}
 
 	for i := 0; i < len(entries); i++ {
 		t.Logf("%d %d", i, len(entries[i]))
-		if entries[i][0].State != browserker.NavInProcess {
+		if entries[i][0].State != browserk.NavInProcess {
 			t.Fatalf("expected in process state was %v\n", entries[i][0].State)
 		}
 	}
 }
 
-func testMakeNavi(id []byte) *browserker.Navigation {
-	return &browserker.Navigation{
+func testMakeNavi(id []byte) *browserk.Navigation {
+	return &browserk.Navigation{
 		ID:               id,
 		StateUpdatedTime: time.Now(),
 		TriggeredBy:      1,
-		State:            browserker.NavUnvisited,
-		Action: &browserker.Action{
-			Type:   browserker.LOAD_URL,
+		State:            browserk.NavUnvisited,
+		Action: &browserk.Action{
+			Type:   browserk.ActLoadURL,
 			Input:  nil,
 			Result: nil,
 		},
@@ -130,8 +130,8 @@ func testMakeReq() gcdapi.NetworkRequest {
 	}
 }
 
-func testMakeResp() map[int64]*browserker.HTTPResponse {
-	return map[int64]*browserker.HTTPResponse{
+func testMakeResp() map[int64]*browserk.HTTPResponse {
+	return map[int64]*browserk.HTTPResponse{
 		0: {
 			NetworkResponse: gcdapi.NetworkResponse{
 				Url:        "http://localhost/",

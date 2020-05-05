@@ -1,4 +1,4 @@
-package browserker
+package browserk
 
 import "context"
 
@@ -6,7 +6,7 @@ type CrawlStep func(ctx context.Context, browser Browser) (next CrawlStep, err e
 
 type Crawler interface {
 	Init() error
-	Start() error
+	Start(ctx context.Context) error
 	GoTo(next *CrawlStep) (*CrawlStep, error)
 	Stop() error
 }

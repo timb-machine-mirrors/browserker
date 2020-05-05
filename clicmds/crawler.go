@@ -3,7 +3,7 @@ package clicmds
 import (
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
-	"gitlab.com/browserker/browserker"
+	"gitlab.com/browserker/browserk"
 	"gitlab.com/browserker/scanner"
 	"gitlab.com/browserker/store"
 )
@@ -29,14 +29,14 @@ func CrawlerFlags() []cli.Flag {
 }
 
 func Crawler(ctx *cli.Context) error {
-	cfg := &browserker.Config{
+	cfg := &browserk.Config{
 		URL:          ctx.String("url"),
 		AllowedHosts: nil,
 		IgnoredHosts: nil,
 		DataPath:     "",
 		AuthScript:   "",
 		AuthType:     0,
-		Credentials: &browserker.Credentials{
+		Credentials: &browserk.Credentials{
 			Username: "",
 			Password: "",
 			Email:    "",

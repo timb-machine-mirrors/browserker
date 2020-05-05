@@ -1,4 +1,6 @@
-package browserker
+package browserk
+
+import "context"
 
 // AttackGrapher is a graph based storage system
 type AttackGrapher interface {
@@ -11,5 +13,7 @@ type AttackGrapher interface {
 type CrawlGrapher interface {
 	Init() error
 	Close() error
+	Find(ctx context.Context, byState, setState NavState, limit int64) [][]*Navigation
 	AddNavigation(nav *Navigation) error
+	GetNavigation(id []byte) (*Navigation, error)
 }

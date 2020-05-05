@@ -1,7 +1,9 @@
-package browserker
+package browserk
+
+import "context"
 
 type Scanner interface {
-	Init() error
+	Init(ctx context.Context) error
 	Start() error
 	Pause() error
 	Stop() error

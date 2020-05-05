@@ -1,4 +1,4 @@
-package browserker
+package browserk
 
 import "io"
 

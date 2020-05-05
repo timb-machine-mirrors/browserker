@@ -1,4 +1,4 @@
-package browserker
+package browserk
 
 type Credentials struct {
 	Username string

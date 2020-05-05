@@ -5,18 +5,18 @@ import (
 
 	badger "github.com/dgraph-io/badger/v2"
 	"github.com/rs/zerolog/log"
-	"gitlab.com/browserker/browserker"
+	"gitlab.com/browserker/browserk"
 )
 
-func PathToNavIDs(txn *badger.Txn, predicates []*NavGraphField, nodeIDs [][]byte) ([][]*browserker.Navigation, error) {
-	entries := make([][]*browserker.Navigation, len(nodeIDs))
+func PathToNavIDs(txn *badger.Txn, predicates []*NavGraphField, nodeIDs [][]byte) ([][]*browserk.Navigation, error) {
+	entries := make([][]*browserk.Navigation, len(nodeIDs))
 
 	for idx, nodeID := range nodeIDs {
 		// TODO INVESTIGATE WHY NODEIDS COULD BE EMPTY
 		if len(nodeID) == 0 {
 			break
 		}
-		entries[idx] = make([]*browserker.Navigation, 0)
+		entries[idx] = make([]*browserk.Navigation, 0)
 		nav, err := DecodeNavigation(txn, predicates, nodeID)
 		if err != nil {
 			return nil, err
@@ -40,7 +40,7 @@ func PathToNavIDs(txn *badger.Txn, predicates []*NavGraphField, nodeIDs [][]byte
 }
 
 // WalkOrigin recursively walks back from a nodeID until we are at the root of the nav graph
-func WalkOrigin(txn *badger.Txn, predicates []*NavGraphField, entries *[]*browserker.Navigation, nodeID []byte) error {
+func WalkOrigin(txn *badger.Txn, predicates []*NavGraphField, entries *[]*browserk.Navigation, nodeID []byte) error {
 	log.Info().Msgf("WalkOrigin: %v", nodeID)
 	if nodeID == nil || len(nodeID) == 0 {
 		log.Info().Msgf("nodeID was nil")

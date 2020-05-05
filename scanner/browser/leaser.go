@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// LeaserService for a browser
 type LeaserService interface {
 	Acquire() (string, error) // returns port number
 	Return(port string) error
@@ -39,6 +40,7 @@ func randProfile(tmp string) string {
 	return profile
 }
 
+// RemoveTmpContents that the browser created
 func RemoveTmpContents(tmp string) error {
 	files, err := filepath.Glob(filepath.Join(tmp, "gcd*"))
 	if err != nil {
@@ -53,6 +55,7 @@ func RemoveTmpContents(tmp string) error {
 	return nil
 }
 
+// KillOldProcesses with a vengence
 func KillOldProcesses() error {
 	killer := FindKill("google-chrome")
 	cmd := exec.Command(killer[0], killer[1:]...)

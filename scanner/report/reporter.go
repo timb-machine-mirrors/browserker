@@ -3,23 +3,23 @@ package report
 import (
 	"io"
 
-	"gitlab.com/browserker/browserker"
+	"gitlab.com/browserker/browserk"
 )
 
 type Reporter struct {
-	reports map[string]map[string]*browserker.Report
+	reports map[string]map[string]*browserk.Report
 }
 
 func New() *Reporter {
-	return &Reporter{reports: make(map[string]map[string]*browserker.Report, 0)}
+	return &Reporter{reports: make(map[string]map[string]*browserk.Report, 0)}
 }
 
-func (r *Reporter) Add(report *browserker.Report) {
+func (r *Reporter) Add(report *browserk.Report) {
 	key := report.VulnID + report.Evidence.Hash()
 	if _, exist := r.reports[report.VulnID]; exist {
 		r.reports[report.VulnID][key] = report
 	}
-	r.reports[report.VulnID] = make(map[string]*browserker.Report)
+	r.reports[report.VulnID] = make(map[string]*browserk.Report)
 	r.reports[report.VulnID][key] = report
 }
 

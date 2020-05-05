@@ -1,10 +1,10 @@
-package browserker
+package browserk
 
 import (
 	"context"
 
-	"gitlab.com/browserker/browserker/inject"
-	"gitlab.com/browserker/browserker/navi"
+	"gitlab.com/browserker/browserk/inject"
+	"gitlab.com/browserker/browserk/navi"
 )
 
 // ActionType defines the action type for a browser action
@@ -12,28 +12,28 @@ type ActionType int8
 
 // revive:disable:var-naming
 const (
-	LOAD_URL ActionType = iota + 1
-	EXECUTE_JS
-	LEFTCLICK
-	LEFTCLICK_DOWN
-	LEFTCLICK_UP
-	RIGHTCLICK
-	RIGHTCLICK_DOWN
-	RIGHTCLICK_UP
-	MIDDLECLICK
-	MIDDLECLICK_DOWN
-	MIDDLECLICK_UP
-	SCROLL
-	SENDKEYS
-	KEYUP
-	KEYDOWN
-	HOVER
-	FOCUS
-	WAIT
+	ActLoadURL ActionType = iota + 1
+	ActExecuteJS
+	ActLeftClick
+	ActLeftClickDown
+	ActLeftClickUp
+	ActRightClick
+	ActRightClickDown
+	ActRightClickUp
+	ActMiddleClick
+	ActMiddleClickDown
+	ActMiddleClickUp
+	ActScroll
+	ActSendKeys
+	ActKeyUp
+	ActKeyDown
+	ActHover
+	ActFocus
+	ActWait
 
 	// ActionTypes that occured automatically
-	REDIRECT
-	SUB_REQUEST
+	ActRedirect
+	ActSubRequest
 )
 
 // Action runs a browser action
@@ -51,8 +51,8 @@ type BrowserOpts struct {
 // Browser interface
 type Browser interface {
 	ID() int64
-	// Load a web page
-	Load(ctx context.Context, url string) (err error)
+	// Navigate to a web page
+	Navigate(ctx context.Context, url string) (err error)
 	Find(ctx context.Context, finder navi.Find) (navi.Element, error)
 	Instrument(opt *BrowserOpts) error
 	InjectBefore(ctx context.Context, inject inject.Injector) error

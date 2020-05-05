@@ -2,10 +2,10 @@ package store
 
 import (
 	badger "github.com/dgraph-io/badger/v2"
-	"gitlab.com/browserker/browserker"
+	"gitlab.com/browserker/browserk"
 )
 
-func StateIterator(txn *badger.Txn, byState browserker.NavState, limit int64) ([][]byte, error) {
+func StateIterator(txn *badger.Txn, byState browserk.NavState, limit int64) ([][]byte, error) {
 	states := make([][]byte, limit)
 	idx := int64(0)
 	it := txn.NewIterator(badger.IteratorOptions{Prefix: []byte("state:")})
@@ -26,7 +26,7 @@ func StateIterator(txn *badger.Txn, byState browserker.NavState, limit int64) ([
 		if err != nil {
 			return nil, err
 		}
-		
+
 		if state == byState {
 			states[idx] = GetID(item.KeyCopy(nil))
 			idx++

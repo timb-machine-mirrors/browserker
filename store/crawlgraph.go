@@ -8,7 +8,7 @@ import (
 	badger "github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
-	"gitlab.com/browserker/browserker"
+	"gitlab.com/browserker/browserk"
 )
 
 type NavGraphField struct {
@@ -46,7 +46,7 @@ func (g *CrawlGraph) Init() error {
 		return err
 	}
 
-	g.navPredicates = g.discoverPredicates(&browserker.Navigation{})
+	g.navPredicates = g.discoverPredicates(&browserk.Navigation{})
 	return nil
 }
 
@@ -67,7 +67,7 @@ func (g *CrawlGraph) discoverPredicates(f interface{}) []*NavGraphField {
 }
 
 // AddNavigation entry into our graph and requests into request store
-func (g *CrawlGraph) AddNavigation(nav *browserker.Navigation) error {
+func (g *CrawlGraph) AddNavigation(nav *browserk.Navigation) error {
 
 	return g.GraphStore.Update(func(txn *badger.Txn) error {
 		for i := 0; i < len(g.navPredicates); i++ {
@@ -86,8 +86,8 @@ func (g *CrawlGraph) AddNavigation(nav *browserker.Navigation) error {
 }
 
 // GetNavigation by the provided id value
-func (g *CrawlGraph) GetNavigation(id []byte) (*browserker.Navigation, error) {
-	exist := &browserker.Navigation{}
+func (g *CrawlGraph) GetNavigation(id []byte) (*browserk.Navigation, error) {
+	exist := &browserk.Navigation{}
 	err := g.GraphStore.View(func(txn *badger.Txn) error {
 		var err error
 
@@ -100,13 +100,13 @@ func (g *CrawlGraph) GetNavigation(id []byte) (*browserker.Navigation, error) {
 // Find navigation entries by a state. iff byState == setState will we not update the
 // state (and time stamp) returns a slice of a slice of all navigations on how to get
 // to the final navigation state (TODO: Optimize with determining graph edges)
-func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserker.NavState, limit int64) [][]*browserker.Navigation {
+func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserk.NavState, limit int64) [][]*browserk.Navigation {
 	// make sure limit is sane
 	if limit <= 0 || limit > 1000 {
 		limit = 1000
 	}
 
-	entries := make([][]*browserker.Navigation, 0)
+	entries := make([][]*browserk.Navigation, 0)
 	if byState == setState {
 		err := g.GraphStore.View(func(txn *badger.Txn) error {
 			nodeIDs, err := StateIterator(txn, byState, limit)

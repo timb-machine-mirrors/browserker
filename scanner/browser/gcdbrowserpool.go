@@ -10,11 +10,12 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
+	"gitlab.com/browserker/browserk"
 )
 
 type BrowserPool interface {
-	Take(ctx context.Context) (*gcd.Gcd, error)
-	Return(ctx context.Context, browser *gcd.Gcd)
+	Take(ctx context.Context) (browserk.Browser, error)
+	Return(ctx context.Context, browser browserk.Browser)
 }
 
 var startupFlags = []string{

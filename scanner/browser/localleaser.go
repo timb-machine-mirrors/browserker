@@ -9,6 +9,7 @@ import (
 	"github.com/wirepair/gcd"
 )
 
+// LocalLeaser for leasing locally
 type LocalLeaser struct {
 	browserLock    sync.RWMutex
 	browsers       map[string]*gcd.Gcd
@@ -16,6 +17,7 @@ type LocalLeaser struct {
 	tmp            string
 }
 
+// NewLocalLeaser for browsers
 func NewLocalLeaser() *LocalLeaser {
 	s := &LocalLeaser{
 		browserLock:    sync.RWMutex{},
@@ -25,6 +27,7 @@ func NewLocalLeaser() *LocalLeaser {
 	return s
 }
 
+// Acquire a new browser
 func (s *LocalLeaser) Acquire() (string, error) {
 	b := gcd.NewChromeDebugger()
 	b.DeleteProfileOnExit()
@@ -45,6 +48,7 @@ func (s *LocalLeaser) Acquire() (string, error) {
 	return string(port), nil
 }
 
+// Count how many browsers
 func (s *LocalLeaser) Count() (string, error) {
 	s.browserLock.RLock()
 	count := len(s.browsers)
@@ -52,6 +56,7 @@ func (s *LocalLeaser) Count() (string, error) {
 	return strconv.Itoa(count), nil
 }
 
+// Return (and kill) the browser
 func (s *LocalLeaser) Return(port string) error {
 	s.browserLock.Lock()
 	defer s.browserLock.Unlock()
@@ -67,6 +72,7 @@ func (s *LocalLeaser) Return(port string) error {
 	return errors.New("not found")
 }
 
+// Cleanup all old browser processes, hope you weren't running chrome!
 func (s *LocalLeaser) Cleanup() (string, error) {
 	if err := KillOldProcesses(); err != nil {
 		return "", err

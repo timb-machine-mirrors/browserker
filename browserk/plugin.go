@@ -1,30 +1,30 @@
-package browserker
+package browserk
 
 type ExecutionType int8
 
 // revive:disable:var-naming
 
 const (
-	ONCE ExecutionType = iota
-	ONCE_PATH
-	ONCE_PER_PAGE
-	ALWAYS
-	ONLY_MIME
-	ONLY_INJECTION
+	ExecOnce ExecutionType = iota
+	ExecOncePath
+	ExecOncePerPage
+	ExecAlways
+	ExecOnlyMIME
+	ExecOnlyInjection
 )
 
 type PluginEvent int8
 
 const (
-	DOCUMENT_REQUEST PluginEvent = iota
-	HTTP_REQUEST
-	HTTP_RESPONSE
-	WEBSOCKET_REQUEST
-	WEBSOCKET_RESPONSE
-	URL
-	JS_RESPONSE
-	STORAGE
-	COOKIE
+	EvtDocumentRequest PluginEvent = iota
+	EvtHTTPRequest
+	EvtHTTPResponse
+	EvtWebSocketRequest
+	EvtWeBSocketResponse
+	EvtURL
+	EvtJSResponse
+	EvtStorage
+	EvtCookie
 )
 
 type PluginOpts struct {

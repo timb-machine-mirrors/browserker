@@ -4,10 +4,10 @@ import (
 	"time"
 
 	badger "github.com/dgraph-io/badger/v2"
-	"gitlab.com/browserker/browserker"
+	"gitlab.com/browserker/browserk"
 )
 
-func UpdateState(txn *badger.Txn, newState browserker.NavState, nodeIDs [][]byte) error {
+func UpdateState(txn *badger.Txn, newState browserk.NavState, nodeIDs [][]byte) error {
 	stateBytes, err := EncodeState(newState)
 	if err != nil {
 		return err
