@@ -303,8 +303,6 @@ func (t *Tab) subscribeInterception(ctx context.Context) {
 				if encoded {
 					body, _ = base64.StdEncoding.DecodeString(bodyStr)
 				}
-				log.Info().Msg("dumping response from GetResponseBody InFetch")
-				spew.Dump(body)
 				t.t.Fetch.FulfillRequestWithParams(&gcdapi.FetchFulfillRequestParams{
 					RequestId:    p.RequestId,
 					ResponseCode: 200,

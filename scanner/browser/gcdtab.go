@@ -132,7 +132,7 @@ func (t *Tab) ID() int64 {
 	return t.id
 }
 
-func (t *Tab) Find(ctx context.Context, finder navi.Find) (*navi.Element, error) {
+func (t *Tab) Find(ctx context.Context, finder navi.Find) (*navi.HTMLElement, error) {
 	return nil, nil
 }
 

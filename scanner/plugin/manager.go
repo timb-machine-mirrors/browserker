@@ -1,14 +1,8 @@
 package plugin
 
-import "gitlab.com/browserker/browserk"
-
 type Manager struct {
 }
 
-func NewLoader() *Manager {
+func New() *Manager {
 	return &Manager{}
-}
-
-func LoadPassive() []browserk.Plugin {
-	return nil
 }

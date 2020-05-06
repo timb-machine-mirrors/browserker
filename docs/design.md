@@ -1,5 +1,9 @@
 # Design
 
+## Scanner Flow
+
+Scanner starts up with configuration.
+
 ## Browsers
 
 A browser is an implementation of a gcd.Tab. The browser pool handles acquiring new browsers and returning old ones. The pool gets browsers from the leaser service which handles starting new ones and closing old ones.
@@ -24,6 +28,10 @@ Should be configurable for types:
 - run only on X injection point types
 - need ability to send direct requests for certain plugin types (might have to rewrite devtool methods/inject capabilities)
 - should plugins have dependencies (on other plugins)?
+
+Active Plugins are directly handed the navigation actions done by a crawler and re-execute them with a reference to the browser, this way they have full control over the entire navigation path and can know when to attack without requiring tracking which requests/responses to attack. Effectively making plugins first class citizens.
+
+Passive Plugins register listeners for the types of data they want (storage events, network events, cookie events) and a passive manager filters out duplicates then dispatches new events to them to process.
 
 ## Crawling
 

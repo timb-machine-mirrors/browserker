@@ -58,7 +58,7 @@ type Browser interface {
 	ID() int64
 	// Navigate to a web page
 	Navigate(ctx context.Context, url string) (err error)
-	Find(ctx context.Context, finder navi.Find) (*navi.Element, error)
+	Find(ctx context.Context, finder Find) (*navi.HTMLElement, error)
 	Instrument(opt *BrowserOpts) error
 	InjectBefore(ctx context.Context, inject inject.Injector) error
 	InjectAfter(ctx context.Context, inject inject.Injector) ([]byte, error)

@@ -176,30 +176,6 @@ type NodeChangeEvent struct {
 	CharacterData  string            // new text value for characterDataModified events
 	ParentNodeID   int               // node id for setChildNodesEvent, childNodeInsertedEvent and childNodeRemovedEvent
 	PreviousNodeID int               // previous node id for childNodeInsertedEvent
-
-}
-
-// NetworkRequest properties of an outbound network requests
-type NetworkRequest struct {
-	RequestID        string                   // Internal chrome request id
-	FrameID          string                   // frame that the request went out on
-	LoaderID         string                   // internal chrome loader id
-	DocumentURL      string                   // url of the frame
-	Request          *gcdapi.NetworkRequest   // underlying Request object
-	Timestamp        float64                  // time the request was dispatched
-	Initiator        *gcdapi.NetworkInitiator // who initiated the request
-	RedirectResponse *gcdapi.NetworkResponse  // non-nil if it was a redirect
-	Type             string                   // Document, Stylesheet, Image, Media, Font, Script, TextTrack, XHR, Fetch, EventSource, WebSocket, Other
-}
-
-// NetworkResponse is an inbound network responses
-type NetworkResponse struct {
-	RequestID string                  // Internal chrome request id
-	FrameID   string                  // frame that the request went out on
-	LoaderID  string                  // internal chrome loader id
-	Response  *gcdapi.NetworkResponse // underlying Response object
-	Timestamp float64                 // time the request was received
-	Type      string                  // Document, Stylesheet, Image, Media, Font, Script, TextTrack, XHR, Fetch, EventSource, WebSocket, Other
 }
 
 // StorageEventType of storage related events.

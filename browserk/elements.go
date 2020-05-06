@@ -1,11 +1,11 @@
 package navi
 
-type ElementType int16
+type HTMLElementType int16
 
 // revive:disable:var-naming
 const (
 	// Main Root
-	HTML ElementType = iota
+	HTML HTMLElementType = iota
 
 	// METADATA
 	BASE
@@ -181,7 +181,8 @@ const (
 	XMP
 )
 
-type Element struct {
-	Type   ElementType
+// HTMLElement type and importance
+type HTMLElement struct {
+	Type   HTMLElementType
 	Weight int8
 }
