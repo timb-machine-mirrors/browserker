@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/wirepair/gcd/gcdapi"
 	"gitlab.com/browserker/browserk"
 	"gitlab.com/browserker/store"
 )
@@ -109,70 +108,6 @@ func testMakeNavi(id []byte) *browserk.Navigation {
 			Type:   browserk.ActLoadURL,
 			Input:  nil,
 			Result: nil,
-		},
-	}
-}
-
-func testMakeReq() gcdapi.NetworkRequest {
-	return gcdapi.NetworkRequest{
-		Url:         "http://localhost/",
-		UrlFragment: "#spa",
-		Method:      "GET",
-		Headers: map[string]interface{}{
-			"Accept": "something",
-		},
-		PostData:         "",
-		HasPostData:      false,
-		MixedContentType: "",
-		InitialPriority:  "",
-		ReferrerPolicy:   "",
-		IsLinkPreload:    false,
-	}
-}
-
-func testMakeResp() map[int64]*browserk.HTTPResponse {
-	return map[int64]*browserk.HTTPResponse{
-		0: {
-			NetworkResponse: gcdapi.NetworkResponse{
-				Url:        "http://localhost/",
-				Status:     0,
-				StatusText: "",
-				Headers: map[string]interface{}{
-					"Set-Cookie": "JSESSIONID=123",
-				},
-				HeadersText: "",
-				MimeType:    "",
-				RequestHeaders: map[string]interface{}{
-					"Accept": "something",
-				},
-				RequestHeadersText: "",
-				ConnectionReused:   false,
-				ConnectionId:       0.0,
-				RemoteIPAddress:    "",
-				RemotePort:         0,
-				FromDiskCache:      false,
-				FromServiceWorker:  false,
-				FromPrefetchCache:  false,
-				EncodedDataLength:  0.0,
-				Timing:             nil,
-				Protocol:           "",
-				SecurityState:      "",
-				SecurityDetails: &gcdapi.NetworkSecurityDetails{
-					Protocol:                          "",
-					KeyExchange:                       "",
-					KeyExchangeGroup:                  "",
-					Cipher:                            "",
-					Mac:                               "",
-					CertificateId:                     0,
-					SubjectName:                       "",
-					SanList:                           nil,
-					Issuer:                            "",
-					ValidFrom:                         0.0,
-					ValidTo:                           0.0,
-					SignedCertificateTimestampList:    nil,
-					CertificateTransparencyCompliance: "",
-				},
-			},
 		},
 	}
 }

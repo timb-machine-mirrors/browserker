@@ -2,17 +2,15 @@
 
 ## Browsers
 
-A browser is an implementation of gcd.Gcd. The browser pool handles acquiring new browsers and returning old ones. The pool gets browsers from the leaser service which handles starting new ones and closing old ones.
-
-
+A browser is an implementation of a gcd.Tab. The browser pool handles acquiring new browsers and returning old ones. The pool gets browsers from the leaser service which handles starting new ones and closing old ones.
 
 ## Storage
 
-Pretty much every data type should be stored in cayley (except maybe reporting?)
+Pretty much every data type should be stored in our custom DB built on badger
 
 - Crawl Graph
 - Attack Graph / Plugin Work Graph
-- Maybe store req/resp in seperate bolt/badger dbs with requestID as key? keep graphs light?
+- Store req/resp in seperate badger nodes with requestID as key? keep graphs light?
 
 ## Plugins
 
@@ -29,7 +27,7 @@ Should be configurable for types:
 
 ## Crawling
 
-Crawling data is stored as a graph with properities of visited or not. This will _hopefully_ allow for using the graph as a queue for edges
+Crawling data is stored as a graph with properities of visited or not. This will allow for using the graph as a queue for edges
 to traverse to find new actions/pages.
 
 - Page/Action should have a status property for a state machine, with timers (maybe store a timestamp for SM) for the event that actions fail and a fail count to 'give up'

@@ -3,12 +3,8 @@ package browser
 import (
 	"bytes"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"net/http"
-	"net/url"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -27,7 +23,7 @@ import (
 type Tab struct {
 	g                     *gcd.Gcd
 	t                     *gcd.ChromeTarget
-	container             *ResponseContainer
+	container             *Container
 	id                    int64
 	eleMutex              *sync.RWMutex          // locks our elements when added/removed.
 	elements              map[int]*Element       // our map of elements for this tab
@@ -55,7 +51,7 @@ type Tab struct {
 func NewTab(ctx context.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Tab {
 	t := &Tab{
 		t:            tab,
-		container:    NewResponseContainer(),
+		container:    NewContainer(),
 		crashedCh:    make(chan string),
 		exitCh:       make(chan struct{}),
 		navigationCh: make(chan int),
@@ -72,11 +68,12 @@ func NewTab(ctx context.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Ta
 	t.navigationTimeout = 30 * time.Second // default 30 seconds for timeout
 	t.elementTimeout = 5 * time.Second     // default 5 seconds for waiting for element.
 	t.stabilityTimeout = 2 * time.Second   // default 2 seconds before we give up waiting for stability
-	t.stableAfter = 300 * time.Millisecond // default 300 ms for consIDering the DOM stable
+	t.stableAfter = 300 * time.Millisecond // default 300 ms for considering the DOM stable
 	t.domChangeHandler = nil
 
 	t.disconnectedHandler = t.defaultDisconnectedHandler
-	t.subscribeBrowserEvents(ctx)
+	go t.listenDebuggerEvents(ctx)
+	t.subscribeBrowserEvents(ctx, true)
 	return t
 }
 
@@ -94,8 +91,15 @@ func (t *Tab) Close() {
 	close(t.exitCh)
 }
 
-// Navigate capture network traffic and take screen shot of DOM and image
+// Navigate to the url
 func (t *Tab) Navigate(ctx context.Context, url string) error {
+	if t.IsNavigating() {
+		return &InvalidNavigationErr{Message: "Unable to navigate, already navigating."}
+	}
+
+	t.setIsNavigating(true)
+	defer t.setIsNavigating(false)
+
 	navParams := &gcdapi.PageNavigateParams{Url: url, TransitionType: "typed"}
 	_, _, errText, err := t.t.Page.NavigateWithParams(navParams)
 	if err != nil {
@@ -106,10 +110,21 @@ func (t *Tab) Navigate(ctx context.Context, url string) error {
 		return errors.Wrap(ErrNavigating, errText)
 	}
 
-	//log.Ctx(ctx).Info().Str("url", url).Str("err_text", errText).Msg("navigating complete")
-	err = t.WaitReady(ctx, time.Second*9)
-	//log.Ctx(ctx).Info().Msg("wait ready returned")
-	return err
+	t.lastNodeChangeTimeVal.Store(time.Now())
+
+	return t.waitReady(ctx, time.Second*9)
+}
+
+// IsShuttingDown answers if we are shutting down or not
+func (t *Tab) IsShuttingDown() bool {
+	if flag, ok := t.shutdown.Load().(bool); ok {
+		return flag
+	}
+	return false
+}
+
+func (t *Tab) setShutdownState(val bool) {
+	t.shutdown.Store(val)
 }
 
 // ID of this browser (tab)
@@ -133,12 +148,9 @@ func (t *Tab) InjectAfter(ctx context.Context, inject inject.Injector) ([]byte, 
 	return nil, nil
 }
 
-func (t *Tab) GetResponses() (map[int64]*browserk.HTTPResponse, error) {
-	return nil, nil
-}
-
-func (t *Tab) GetRequest() (*browserk.HTTPRequest, error) {
-	return nil, nil
+func (t *Tab) GetMessages() ([]*browserk.HTTPMessage, error) {
+	msgs := t.container.GetMessages()
+	return msgs, nil
 }
 
 func (t *Tab) Execute(ctx context.Context, act map[int]*browserk.Action) error {
@@ -185,7 +197,7 @@ func (t *Tab) GetURL(ctx context.Context) string {
 }
 
 // WaitReady waits for the page to load, DOM to be stable, and no network traffic in progress
-func (t *Tab) WaitReady(ctx context.Context, stableAfter time.Duration) error {
+func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 	ticker := time.NewTicker(150 * time.Millisecond)
 	defer ticker.Stop()
 
@@ -221,8 +233,8 @@ func (t *Tab) WaitReady(ctx context.Context, stableAfter time.Duration) error {
 			return ErrTimedOut
 		case <-ticker.C:
 			if changeTime, ok := t.lastNodeChangeTimeVal.Load().(time.Time); ok {
-				//log.Info().Int32("requests", t.container.GetRequests()).Msgf("tick %s", time.Now().Sub(changeTime))
-				if time.Now().Sub(changeTime) >= stableAfter && t.container.GetRequests() == 0 {
+				//log.Info().Int32("requests", t.container.OpenRequestCount()).Msgf("tick %s", time.Now().Sub(changeTime))
+				if time.Now().Sub(changeTime) >= stableAfter && t.container.OpenRequestCount() == 0 {
 					// times up, should be stable now
 					log.Ctx(ctx).Info().Msg("stable")
 					return nil
@@ -282,8 +294,8 @@ func (t *Tab) setTopFrameID(topFrameID string) {
 	t.topFrameID.Store(topFrameID)
 }
 
-// GetTopFrameID return the top frame ID of this tab
-func (t *Tab) GetTopFrameID() string {
+// getTopFrameID return the top frame ID of this tab
+func (t *Tab) getTopFrameID() string {
 	if frameID, ok := t.topFrameID.Load().(string); ok {
 		return frameID
 	}
@@ -294,8 +306,8 @@ func (t *Tab) setTopNodeID(nodeID int) {
 	t.topNodeID.Store(nodeID)
 }
 
-// GetTopNodeID returns the current top node ID of this Tab.
-func (t *Tab) GetTopNodeID() int {
+// getTopNodeID returns the current top node ID of this Tab.
+func (t *Tab) getTopNodeID() int {
 	if topNodeID, ok := t.topNodeID.Load().(int); ok {
 		return topNodeID
 	}
@@ -444,7 +456,7 @@ func (t *Tab) getDocument() (*Element, error) {
 
 // GetDocument returns the top level document element for this tab.
 func (t *Tab) GetDocument() (*Element, error) {
-	docEle, ok := t.getElement(t.GetTopNodeID())
+	docEle, ok := t.getElement(t.getTopNodeID())
 	if !ok {
 		return nil, &ElementNotFoundErr{Message: "top document node ID not found."}
 	}
@@ -495,7 +507,7 @@ func (t *Tab) GetAllElements() map[int]*Element {
 // GetElementByID returns the element by searching the top level document for an element with attributeID
 // Does not work on frames.
 func (t *Tab) GetElementByID(attributeID string) (*Element, bool, error) {
-	return t.GetDocumentElementByID(t.GetTopNodeID(), attributeID)
+	return t.GetDocumentElementByID(t.getTopNodeID(), attributeID)
 }
 
 // GetDocumentElementByID returns an element from a specific Document.
@@ -519,7 +531,7 @@ func (t *Tab) GetDocumentElementByID(docNodeID int, attributeID string) (*Elemen
 
 // GetElementsBySelector all elements that match a selector from the top level document
 func (t *Tab) GetElementsBySelector(selector string) ([]*Element, error) {
-	return t.GetDocumentElementsBySelector(t.GetTopNodeID(), selector)
+	return t.GetDocumentElementsBySelector(t.getTopNodeID(), selector)
 }
 
 // GetChildElements all elements of a child
@@ -618,7 +630,7 @@ func (t *Tab) GetElementsBySearch(selector string, includeUserAgentShadowDOM boo
 // GetPageSource returns the document's source, as visible, if docID is 0, returns top document source.
 func (t *Tab) GetPageSource(docNodeID int) (string, error) {
 	if docNodeID == 0 {
-		docNodeID = t.GetTopNodeID()
+		docNodeID = t.getTopNodeID()
 	}
 	doc, ok := t.getElement(docNodeID)
 	if !ok {
@@ -630,7 +642,7 @@ func (t *Tab) GetPageSource(docNodeID int) (string, error) {
 
 // GetCurrentURL returns the current url of the top level document
 func (t *Tab) GetCurrentURL() (string, error) {
-	return t.GetDocumentCurrentURL(t.GetTopNodeID())
+	return t.GetDocumentCurrentURL(t.getTopNodeID())
 }
 
 // GetDocumentCurrentURL returns the current url of the provIDed docNodeID
@@ -674,77 +686,6 @@ func (t *Tab) SerializeDOM() string {
 	return html
 }
 
-// GetNetworkTraffic returns all responses after page load
-func (t *Tab) GetNetworkTraffic() (*Response, []*Response) {
-	return t.container.GetResponses()
-}
-
-// CaptureNetworkTraffic ensures we capture all traffic (only saving text bodies) during navigation.
-func (t *Tab) CaptureNetworkTraffic(ctx context.Context, URL string) {
-
-	t.t.Network.EnableWithParams(&gcdapi.NetworkEnableParams{
-		MaxPostDataSize:       -1,
-		MaxResourceBufferSize: -1,
-		MaxTotalBufferSize:    -1,
-	})
-
-	t.t.Subscribe("network.loadingFailed", func(target *gcd.ChromeTarget, payload []byte) {
-		log.Info().Msgf("failed: %s\n", string(payload))
-	})
-
-	t.t.Subscribe("Network.requestWillBeSent", func(target *gcd.ChromeTarget, payload []byte) {
-		message := &gcdapi.NetworkRequestWillBeSentEvent{}
-		if err := json.Unmarshal(payload, message); err != nil {
-			return
-		}
-		//message.Params.RedirectResponse.RemoteIPAddress
-		if message.Params.Type == "Document" {
-			//log.Info().Msgf("%s", string(payload))
-			t.container.SetLoadRequest(message.Params.RequestId)
-		}
-	})
-
-	t.t.Subscribe("Network.responseReceived", func(target *gcd.ChromeTarget, payload []byte) {
-		//log.Info().Msgf("RESPONSE DATA: %#v\n", string(payload))
-		defer t.container.DecRequest()
-		t.container.IncRequest()
-
-		message := &gcdapi.NetworkResponseReceivedEvent{}
-		if err := json.Unmarshal(payload, message); err != nil {
-			return
-		}
-
-		timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*10)
-		defer cancel()
-
-		p := message.Params
-
-		//log.Ctx(ctx).Info().Str("request_ID", p.RequestID).Str("url", url).Msg("waiting")
-		if err := t.container.WaitFor(timeoutCtx, p.RequestId); err != nil {
-			return
-		}
-
-		// ignore file/data urls
-		if strings.HasPrefix(p.Response.Url, "data") || strings.HasPrefix(p.Response.Url, "file") {
-			return
-		}
-
-		t.buildResponse(URL, message)
-		//log.Ctx(ctx).Info().Str("request_ID", p.RequestID).Str("url", url).Msg("adding response")
-		//t.container.Add(response)
-	})
-
-	t.t.Subscribe("Network.loadingFinished", func(target *gcd.ChromeTarget, payload []byte) {
-		//log.Info().Msgf("loadingFinished DATA: %#v\n", string(payload))
-		message := &gcdapi.NetworkLoadingFinishedEvent{}
-		if err := json.Unmarshal(payload, message); err != nil {
-			return
-		}
-		//log.Ctx(ctx).Info().Str("request_ID", message.Params.RequestID).Msg("finished")
-		t.container.BodyReady(message.Params.RequestId)
-	})
-}
-
 // Sets the element as invalid and removes it from our elements map
 func (t *Tab) invalidateRemove(ele *Element) {
 	ele.setInvalidated(true)
@@ -755,12 +696,13 @@ func (t *Tab) invalidateRemove(ele *Element) {
 
 // the entire document has been invalidated, request all nodes again
 func (t *Tab) documentUpdated() {
+	log.Info().Msg("document has been invalidated")
 	t.getDocument()
 }
 
 // Ask the debugger service for child nodes.
-func (t *Tab) requestChildNodes(nodeId, depth int) {
-	_, err := t.t.DOM.RequestChildNodes(nodeId, depth, false)
+func (t *Tab) requestChildNodes(nodeID, depth int) {
+	_, err := t.t.DOM.RequestChildNodes(nodeID, depth, false)
 	if err != nil {
 		log.Debug().Msgf("error requesting child nodes: %s\n", err)
 	}
@@ -809,94 +751,202 @@ func (t *Tab) addNodes(node *gcdapi.DOMNode) {
 	t.lastNodeChangeTimeVal.Store(time.Now())
 }
 
-// buildResponse fills out a new with all relevant details
-func (t *Tab) buildResponse(URL string, message *gcdapi.NetworkResponseReceivedEvent) {
-	p := message.Params
-
-	// set additional properties of web certificate
-
-	if p.Type == "Document" {
-		log.Info().Msg("is document")
-	}
-
-}
-
-// encode the header depending on type, and lower case the header name so easier to search in DB.
-func (t *Tab) encodeHeaders(gcdHeaders map[string]interface{}) map[string]string {
-	headers := make(map[string]string, len(gcdHeaders))
-	for k, v := range gcdHeaders {
-		name := strings.ToLower(k)
-		switch rv := v.(type) {
-		case string:
-			headers[name] = rv
-		case []string:
-			headers[name] = strings.Join(rv, ",")
-		case nil:
-			headers[name] = ""
-		default:
-			log.Warn().Str("header_name", k).Msg("unable to encode header value")
+// Listens for NodeChangeEvents and crash events, dispatches them accordingly.
+// Calls the user defined domChangeHandler if bound. Updates the lastNodeChangeTime
+// to the current time. If the target crashes or is detached, call the disconnectedHandler.
+func (t *Tab) listenDebuggerEvents(ctx context.Context) {
+	for {
+		select {
+		case nodeChangeEvent := <-t.nodeChange:
+			t.handleNodeChange(nodeChangeEvent)
+			// if the caller registered a dom change listener, call it
+			if t.domChangeHandler != nil {
+				t.domChangeHandler(t, nodeChangeEvent)
+			}
+			t.lastNodeChangeTimeVal.Store(time.Now())
+		case reason := <-t.crashedCh:
+			if t.disconnectedHandler != nil {
+				go t.disconnectedHandler(t, reason)
+			}
+		case <-t.exitCh:
+			log.Info().Msg("exiting...")
+			return
+		case <-ctx.Done():
+			log.Info().Msg("context done exiting...")
+			return
 		}
 	}
-	return headers
 }
 
-func (t *Tab) extractCertificate(message *gcdapi.NetworkResponseReceivedEvent) error {
-	p := message.Params
+// Handles the document updated event. This occurs after a navigation or redirect.
+// This is a destructive action which invalidates all document nodeids and their children.
+// We loop through our current list of elements and invalidate them so any references
+// can check if they are valid or not. We then recreate the elements map. Finally, if we
+// are navigating, we want to block Navigate from returning until we have a valid document,
+// so we use the docUpdateCh to signal when complete.
+func (t *Tab) handleDocumentUpdated() {
+	// set all elements as invalid and destroy the Elements map.
+	t.eleMutex.Lock()
+	for _, ele := range t.elements {
+		ele.setInvalidated(true)
+	}
+	t.elements = make(map[int]*Element)
+	t.eleMutex.Unlock()
 
-	u, err := url.Parse(p.Response.Url)
-	log.Info().Msgf("url: %s\n", u)
+	t.documentUpdated()
+	// notify if navigating that we received the document update event.
+	if t.IsNavigating() {
+		t.docUpdateCh <- struct{}{} // notify listeners document was updated
+	}
+}
 
-	/*
-		if u.Hostname() == t.address && u.Scheme == "https" &&
-			strings.HasPrefix(p.Response.Url, "https") && p.Response.SecurityDetails != nil {
-				cert := convert.NetworkCertificateToWebCertificate(p.Response.SecurityDetails)
-				cert.AddressHash = convert.HashAddress(ipAddress, host)
-				cert.IPAddress = ipAddress
-				cert.Port = port
+// handle node change events, updating, inserting invalidating and removing
+func (t *Tab) handleNodeChange(change *NodeChangeEvent) {
+	// if we are shutting down, do not handle new node changes.
+	if t.IsShuttingDown() {
+		return
+	}
+
+	switch change.EventType {
+	case DocumentUpdatedEvent:
+		t.handleDocumentUpdated()
+	case SetChildNodesEvent:
+		t.handleSetChildNodes(change.ParentNodeID, change.Nodes)
+	case AttributeModifiedEvent:
+		if ele, ok := t.getElement(change.NodeID); ok {
+			if err := ele.WaitForReady(); err == nil {
+				ele.updateAttribute(change.Name, change.Value)
+			}
 		}
-	*/
-	return err
+	case AttributeRemovedEvent:
+		if ele, ok := t.getElement(change.NodeID); ok {
+			if err := ele.WaitForReady(); err == nil {
+				ele.removeAttribute(change.Name)
+			}
+		}
+	case CharacterDataModifiedEvent:
+		if ele, ok := t.getElement(change.NodeID); ok {
+			if err := ele.WaitForReady(); err == nil {
+				ele.updateCharacterData(change.CharacterData)
+			}
+		}
+	case ChildNodeCountUpdatedEvent:
+		if ele, ok := t.getElement(change.NodeID); ok {
+			if err := ele.WaitForReady(); err == nil {
+				ele.updateChildNodeCount(change.ChildNodeCount)
+			}
+			// request the child nodes
+			t.requestChildNodes(change.NodeID, 1)
+		}
+	case ChildNodeInsertedEvent:
+		t.handleChildNodeInserted(change.ParentNodeID, change.Node)
+	case ChildNodeRemovedEvent:
+		t.handleChildNodeRemoved(change.ParentNodeID, change.NodeID)
+	}
+
 }
 
-func (t *Tab) encodeResponseBody(p *gcdapi.NetworkResponseReceivedEvent) string {
-
-	var err error
-	var encoded bool
-	var body []byte
-	var bodyStr string
-
-	bodyStr, encoded, err = t.t.Network.GetResponseBody(p.Params.RequestId)
-	if err != nil {
-		log.Warn().Str("url", p.Params.Response.Url).Err(err).Msg("failed to get body")
+// setChildNode event handling will add nodes to our elements map and update
+// the parent reference Children
+func (t *Tab) handleSetChildNodes(parentNodeID int, nodes []*gcdapi.DOMNode) {
+	for _, node := range nodes {
+		t.addNodes(node)
 	}
-
-	body = []byte(bodyStr)
-	if encoded {
-		body, _ = base64.StdEncoding.DecodeString(bodyStr)
+	parent, ok := t.GetElementByNodeID(parentNodeID)
+	if ok {
+		if err := parent.WaitForReady(); err == nil {
+			parent.addChildren(nodes)
+		}
 	}
+	t.lastNodeChangeTimeVal.Store(time.Now())
 
-	// we don't want to capture anything other than text based files.
-	if !strings.HasPrefix(http.DetectContentType(body), "text") {
-		bodyStr = ""
-	}
-
-	return bodyStr
 }
 
-func (t *Tab) domUpdated(ctx context.Context) func(target *gcd.ChromeTarget, payload []byte) {
-	return func(target *gcd.ChromeTarget, payload []byte) {
-		//log.Ctx(ctx).Info().Msg("dom updated")
-		t.lastNodeChangeTimeVal.Store(time.Now())
+// update parent with new child node and add the new nodes.
+func (t *Tab) handleChildNodeInserted(parentNodeID int, node *gcdapi.DOMNode) {
+	t.lastNodeChangeTimeVal.Store(time.Now())
+	if node == nil {
+		return
+	}
+	t.addNodes(node)
+
+	parent, _ := t.GetElementByNodeID(parentNodeID)
+	// make sure we have the parent before we add children
+	if err := parent.WaitForReady(); err == nil {
+		parent.addChild(node)
+		return
+	}
+
+}
+
+// update ParentNodeId to remove child and iterate over Children recursively and invalidate them.
+// TODO: come up with a better way of removing children without direct access to the node
+// as it's a potential race condition if it's being modified.
+func (t *Tab) handleChildNodeRemoved(parentNodeID, nodeID int) {
+	ele, ok := t.getElement(nodeID)
+	if !ok {
+		return
+	}
+	ele.setInvalidated(true)
+	parent, ok := t.getElement(parentNodeID)
+
+	if ok {
+		if err := parent.WaitForReady(); err == nil {
+			parent.removeChild(ele.NodeID())
+		}
+	}
+
+	// if not ready, node will be nil
+	if ele.IsReadyInvalid() {
+		t.invalidateChildren(ele.node)
+	}
+
+	t.eleMutex.Lock()
+	delete(t.elements, nodeID)
+	t.eleMutex.Unlock()
+}
+
+// when a childNodeRemoved event occurs, we need to set each child
+// to invalidated and remove it from our elements map.
+func (t *Tab) invalidateChildren(node *gcdapi.DOMNode) {
+	// invalidate & remove ContentDocument node and children
+	if node.ContentDocument != nil {
+		ele, ok := t.getElement(node.ContentDocument.NodeId)
+		if ok {
+			t.invalidateRemove(ele)
+			t.invalidateChildren(node.ContentDocument)
+		}
+	}
+
+	if node.Children == nil {
+		return
+	}
+
+	// invalidate node.Children
+	for _, child := range node.Children {
+		ele, ok := t.getElement(child.NodeId)
+		if !ok {
+			continue
+		}
+		t.invalidateRemove(ele)
+		// recurse and remove children of this node
+		t.invalidateChildren(ele.node)
 	}
 }
 
-func (t *Tab) subscribeBrowserEvents(ctx context.Context) {
+func (t *Tab) subscribeBrowserEvents(ctx context.Context, intercept bool) {
 	t.t.DOM.Enable()
 	t.t.Inspector.Enable()
 	t.t.Page.Enable()
 	t.t.Security.Enable()
 	t.t.Console.Enable()
 	t.t.Debugger.Enable(-1)
+
+	t.t.Network.EnableWithParams(&gcdapi.NetworkEnableParams{
+		MaxPostDataSize:       -1,
+		MaxResourceBufferSize: -1,
+		MaxTotalBufferSize:    -1,
+	})
 
 	t.t.Security.SetOverrideCertificateErrors(true)
 
@@ -916,44 +966,44 @@ func (t *Tab) subscribeBrowserEvents(ctx context.Context) {
 		log.Ctx(ctx).Info().Msg("certificate error handled")
 	})
 
-	t.t.Subscribe("Inspector.targetCrashed", func(target *gcd.ChromeTarget, payload []byte) {
-		log.Ctx(ctx).Warn().Msgf("tab crashed: %s", string(payload))
-		select {
-		case t.crashedCh <- "crashed":
-		case <-t.exitCh:
+	// network related events
+	t.subscribeNetworkEvents(ctx)
+	if intercept {
+		patterns := []*gcdapi.FetchRequestPattern{
+			{
+				UrlPattern:   "*",
+				RequestStage: "Request",
+			},
+			{
+				UrlPattern:   "*",
+				RequestStage: "Response",
+			},
 		}
-	})
+		t.t.Fetch.EnableWithParams(&gcdapi.FetchEnableParams{
+			Patterns:           patterns,
+			HandleAuthRequests: false,
+		})
+		t.subscribeInterception(ctx)
+	}
+	// crash related events
+	t.subscribeTargetCrashed()
+	t.subscribeTargetDetached()
 
-	t.t.Subscribe("Inspector.detached", func(target *gcd.ChromeTarget, payload []byte) {
-		header := &gcdapi.InspectorDetachedEvent{}
-		err := json.Unmarshal(payload, header)
-		reason := "detached"
+	// load releated events
+	t.subscribeLoadEvent()
+	t.subscribeFrameLoadingEvent()
+	t.subscribeFrameFinishedEvent()
 
-		if err == nil {
-			reason = header.Params.Reason
-		}
+	// DOM update related events
+	t.subscribeDocumentUpdated()
+	t.subscribeSetChildNodes()
+	t.subscribeAttributeModified()
+	t.subscribeAttributeRemoved()
+	t.subscribeCharacterDataModified()
+	t.subscribeChildNodeCountUpdated()
+	t.subscribeChildNodeInserted()
+	t.subscribeChildNodeRemoved()
 
-		select {
-		case t.crashedCh <- reason:
-		case <-t.exitCh:
-		}
-	})
-
-	t.t.Subscribe("Page.loadEventFired", func(target *gcd.ChromeTarget, payload []byte) {
-		select {
-		case t.navigationCh <- 0:
-		case <-t.exitCh:
-		}
-	})
-
-	// new nodes
-	t.t.Subscribe("DOM.setChildNodes", t.domUpdated(ctx))
-	t.t.Subscribe("DOM.attributeModified", t.domUpdated(ctx))
-	t.t.Subscribe("DOM.attributeRemoved", t.domUpdated(ctx))
-	t.t.Subscribe("DOM.characterDataModified", t.domUpdated(ctx))
-	t.t.Subscribe("DOM.childNodeCountUpdated", t.domUpdated(ctx))
-	t.t.Subscribe("DOM.childNodeInserted", t.domUpdated(ctx))
-	t.t.Subscribe("DOM.childNodeRemoved", t.domUpdated(ctx))
-	t.t.Subscribe("DOM.documentUpdated", t.domUpdated(ctx))
-
+	// misc
+	// t.subscribeStorageEvents(nil)
 }

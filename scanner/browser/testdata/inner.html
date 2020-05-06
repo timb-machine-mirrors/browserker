@@ -1,0 +1,18 @@
+<html>
+<head>
+<title>inner frame document modification</title>
+<script>
+window.addEventListener('load', function() {
+	var blah = document.createElement("div");
+	blah.innerHTML = "HELLLOOOO";
+	document.getElementById('output').appendChild(blah);
+
+});
+</script>
+</head>
+<body>
+	
+	<div id="output">blerp</div>
+</iframe>
+</body>
+</html>

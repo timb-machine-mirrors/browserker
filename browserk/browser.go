@@ -62,8 +62,7 @@ type Browser interface {
 	Instrument(opt *BrowserOpts) error
 	InjectBefore(ctx context.Context, inject inject.Injector) error
 	InjectAfter(ctx context.Context, inject inject.Injector) ([]byte, error)
-	GetResponses() (map[int64]*HTTPResponse, error)
-	GetRequest() (*HTTPRequest, error)
+	GetMessages() ([]*HTTPMessage, error)
 	Screenshot(ctx context.Context) (string, error)
 	Execute(ctx context.Context, act map[int]*Action) error
 	ExecuteSingle(ctx context.Context, act *Action) error

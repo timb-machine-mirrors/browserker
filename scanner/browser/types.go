@@ -1,9 +1,12 @@
 package browser
 
 import (
+	"crypto/sha1"
+
 	"github.com/pkg/errors"
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
+	"gitlab.com/browserker/browserk"
 )
 
 // https://chromium.googlesource.com/chromium/src/+/master/third_party/WebKit/Source/core/inspector/InspectorNetworkAgent.cpp#96
@@ -209,4 +212,40 @@ type StorageEvent struct {
 	Key            string // storage key
 	NewValue       string // new storage value
 	OldValue       string // old storage value
+}
+
+func GCDRequestToBrowserk(req *gcdapi.NetworkRequestWillBeSentEvent) *browserk.HTTPRequest {
+	p := req.Params
+	return &browserk.HTTPRequest{
+		RequestId:        p.RequestId,
+		LoaderId:         p.LoaderId,
+		DocumentURL:      p.DocumentURL,
+		Request:          p.Request,
+		Timestamp:        p.Timestamp,
+		WallTime:         p.WallTime,
+		Initiator:        p.Initiator,
+		RedirectResponse: p.RedirectResponse,
+		Type:             p.Type,
+		FrameId:          p.FrameId,
+		HasUserGesture:   p.HasUserGesture,
+	}
+}
+
+// GCDResponseToBrowserk convert resp with body
+// TODO: have a service check if we already have this body (via hash) and don't bother storing
+func GCDResponseToBrowserk(resp *gcdapi.NetworkResponseReceivedEvent, body []byte) *browserk.HTTPResponse {
+	p := resp.Params
+	h := sha1.New()
+	h.Write(body)
+
+	return &browserk.HTTPResponse{
+		RequestId: p.RequestId,
+		LoaderId:  p.LoaderId,
+		Timestamp: p.Timestamp,
+		Type:      p.Type,
+		Response:  p.Response,
+		FrameId:   p.FrameId,
+		Body:      body,
+		BodyHash:  h.Sum(nil),
+	}
 }

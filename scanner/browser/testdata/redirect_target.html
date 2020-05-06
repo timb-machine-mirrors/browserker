@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<head>
+<title>target of redirect</title>
+<script>
+window.addEventListener('load', function() {
+	setTimeout(function() {
+		var child = document.getElementById('child');
+		var newDiv = document.createElement('div');
+		newDiv.innerHTML = "hello";
+		child.appendChild(newDiv);
+	}, 500)
+});
+</script>
+</head>
+<body>
+	<div id="parent_redirect">
+		<div id="child">i'm a target page</div>
+	</div>
+</iframe>
+</body>
+</html>

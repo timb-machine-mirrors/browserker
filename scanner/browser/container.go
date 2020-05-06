@@ -4,98 +4,116 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+
+	"github.com/rs/zerolog/log"
+	"gitlab.com/browserker/browserk"
 )
 
-type Response struct {
-	RequestID string
-	Body      string
-}
+type Container struct {
+	messageLock   sync.RWMutex
+	messages      map[string]*browserk.HTTPMessage
+	loadRequestID string
 
-type ResponseContainer struct {
-	responsesLock sync.RWMutex
-	loadRequest   string
-	responses     map[string]*Response
-
-	readyLock sync.RWMutex
-	ready     map[string]chan struct{}
+	respReadyLock sync.RWMutex
+	respReady     map[string]chan struct{}
 
 	requestCount int32
 }
 
-func NewResponseContainer() *ResponseContainer {
-	return &ResponseContainer{
-		responses: make(map[string]*Response),
-		ready:     make(map[string]chan struct{}),
+func NewContainer() *Container {
+	return &Container{
+		messages:  make(map[string]*browserk.HTTPMessage),
+		respReady: make(map[string]chan struct{}),
 	}
 }
 
 // SetLoadRequest uses the requestID of the *first* request as
 // our key to return the httpresponse in GetResponses.
-func (c *ResponseContainer) SetLoadRequest(requestID string) {
-	c.responsesLock.Lock()
-	defer c.responsesLock.Unlock()
-	if c.loadRequest != "" {
+func (c *Container) SetLoadRequest(request *browserk.HTTPRequest) {
+	c.messageLock.Lock()
+	defer c.messageLock.Unlock()
+	if c.loadRequestID != "" {
 		return
 	}
-	c.loadRequest = requestID
-
+	c.loadRequestID = request.RequestId
 }
 
-// GetResponses returns the main load reseponse and all responses then clears the container
-func (c *ResponseContainer) GetResponses() (*Response, []*Response) {
-	var loadResponse *Response
-	c.responsesLock.Lock()
-	defer c.responsesLock.Unlock()
-	r := make([]*Response, len(c.responses))
+// GetMessages returns all of the http req/resp messages
+func (c *Container) GetMessages() []*browserk.HTTPMessage {
+	c.messageLock.Lock()
+	defer c.messageLock.Unlock()
+	msgs := make([]*browserk.HTTPMessage, len(c.messages))
 	i := 0
-	for _, v := range c.responses {
+	log.Info().Msgf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!we have %d messages", len(c.messages))
+	for _, v := range c.messages {
 		if v == nil {
 			continue
 		}
-		r[i] = v
-		if v.RequestID == c.loadRequest {
-			loadResponse = v
-		}
+		msgs[i] = v
 		i++
 	}
-	c.responses = make(map[string]*Response, 0)
-	c.loadRequest = ""
-	return loadResponse, r
+	c.messages = make(map[string]*browserk.HTTPMessage, 0)
+	c.loadRequestID = ""
+	return msgs
 }
 
-// Add a response to our map
-func (c *ResponseContainer) Add(response *Response) {
-	c.responsesLock.Lock()
-	c.responses[response.RequestID] = response
-	c.responsesLock.Unlock()
+// AddRequest to our map of messages
+func (c *Container) AddRequest(request *browserk.HTTPRequest) {
+	var exist bool
+	msg := &browserk.HTTPMessage{}
+
+	c.messageLock.Lock()
+	if msg, exist = c.messages[request.RequestId]; !exist {
+		msg = &browserk.HTTPMessage{}
+	}
+	msg.Request = request
+	c.messages[request.RequestId] = msg
+	c.messageLock.Unlock()
 }
 
-func (c *ResponseContainer) IncRequest() {
+// AddResponse to our map of messages
+func (c *Container) AddResponse(response *browserk.HTTPResponse) {
+	var exist bool
+	msg := &browserk.HTTPMessage{}
+	log.Info().Str("request_id", response.RequestId).Msg("adding response")
+	c.messageLock.Lock()
+	if msg, exist = c.messages[response.RequestId]; !exist {
+		msg = &browserk.HTTPMessage{}
+	}
+	msg.Response = response
+	c.messages[response.RequestId] = msg
+	c.messageLock.Unlock()
+}
+
+// IncRequest count
+func (c *Container) IncRequest() {
 	atomic.AddInt32(&c.requestCount, 1)
 }
 
-func (c *ResponseContainer) DecRequest() {
+// DecRequest count
+func (c *Container) DecRequest() {
 	atomic.AddInt32(&c.requestCount, -1)
 }
 
-func (c *ResponseContainer) GetRequests() int32 {
+// OpenRequestCount number of open requests observed 0 means we have everything
+func (c *Container) OpenRequestCount() int32 {
 	return atomic.LoadInt32(&c.requestCount)
 }
 
-// WaitFor see if we have a readyCh for this request, if we don't, make the channel
-// if we do, it is already closed so we can return
-func (c *ResponseContainer) WaitFor(ctx context.Context, requestID string) error {
+// WaitFor if we have a readyCh for this request, if we don't, make the channel.
+// If we do, it is already closed so we can return
+func (c *Container) WaitFor(ctx context.Context, requestID string) error {
 	var readyCh chan struct{}
 	var ok bool
 
 	defer c.remove(requestID)
 
-	c.readyLock.Lock()
-	if readyCh, ok = c.ready[requestID]; !ok {
+	c.respReadyLock.Lock()
+	if readyCh, ok = c.respReady[requestID]; !ok {
 		readyCh = make(chan struct{})
-		c.ready[requestID] = readyCh
+		c.respReady[requestID] = readyCh
 	}
-	c.readyLock.Unlock()
+	c.respReadyLock.Unlock()
 
 	select {
 	case <-readyCh:
@@ -106,18 +124,18 @@ func (c *ResponseContainer) WaitFor(ctx context.Context, requestID string) error
 }
 
 // BodyReady signals WaitFor that the response is done, and we can start reading the body
-func (c *ResponseContainer) BodyReady(requestID string) {
-	c.readyLock.Lock()
-	if _, ok := c.ready[requestID]; !ok {
-		c.ready[requestID] = make(chan struct{})
+func (c *Container) BodyReady(requestID string) {
+	c.respReadyLock.Lock()
+	if _, ok := c.respReady[requestID]; !ok {
+		c.respReady[requestID] = make(chan struct{})
 	}
-	close(c.ready[requestID])
-	c.readyLock.Unlock()
+	close(c.respReady[requestID])
+	c.respReadyLock.Unlock()
 }
 
 // remove the request from our ready map
-func (c *ResponseContainer) remove(requestID string) {
-	c.readyLock.Lock()
-	delete(c.ready, requestID)
-	c.readyLock.Unlock()
+func (c *Container) remove(requestID string) {
+	c.respReadyLock.Lock()
+	delete(c.respReady, requestID)
+	c.respReadyLock.Unlock()
 }

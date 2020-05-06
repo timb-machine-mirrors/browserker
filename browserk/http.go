@@ -4,6 +4,14 @@ import "github.com/wirepair/gcd/gcdapi"
 
 // revive:disable:var-naming
 
+// HTTPMessage is the request/response pair
+type HTTPMessage struct {
+	Request     *HTTPRequest
+	RequestMod  *HTTPModifiedRequest
+	Response    *HTTPResponse
+	ResponseMod *HTTPModifiedResponse
+}
+
 // HTTPRequest contains all information regarding a network request
 type HTTPRequest struct {
 	RequestId        string                   `json:"requestId"`                  // Request identifier.
@@ -21,13 +29,14 @@ type HTTPRequest struct {
 
 // HTTPResponse contains all information regarding a network response
 type HTTPResponse struct {
-	RequestId string                  `json:"requestId"`         // Request identifier.
-	LoaderId  string                  `json:"loaderId"`          // Loader identifier. Empty string if the request is fetched from worker.
-	Timestamp float64                 `json:"timestamp"`         // Timestamp.
-	Type      string                  `json:"type"`              // Resource type. enum values: Document, Stylesheet, Image, Media, Font, Script, TextTrack, XHR, Fetch, EventSource, WebSocket, Manifest, SignedExchange, Ping, CSPViolationReport, Other
-	Response  *gcdapi.NetworkResponse `json:"response"`          // Response data.
-	FrameId   string                  `json:"frameId,omitempty"` // Frame identifier.
-	request   HTTPRequest
+	RequestId string                  `json:"requestId"`           // Request identifier.
+	LoaderId  string                  `json:"loaderId"`            // Loader identifier. Empty string if the request is fetched from worker.
+	Timestamp float64                 `json:"timestamp"`           // Timestamp.
+	Type      string                  `json:"type"`                // Resource type. enum values: Document, Stylesheet, Image, Media, Font, Script, TextTrack, XHR, Fetch, EventSource, WebSocket, Manifest, SignedExchange, Ping, CSPViolationReport, Other
+	Response  *gcdapi.NetworkResponse `json:"response"`            // Response data.
+	FrameId   string                  `json:"frameId,omitempty"`   // Frame identifier.
+	Body      []byte                  `json:"body,omitempty"`      // Raw captured body data
+	BodyHash  []byte                  `json:"body_hash,omitempty"` // sha1 hash of body data
 }
 
 // InterceptedHTTPRequest contains all information regarding an intercepted request
