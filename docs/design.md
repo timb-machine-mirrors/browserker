@@ -2,7 +2,17 @@
 
 ## Scanner Flow
 
-Scanner starts up with configuration.
+- Starts up with configuration.
+- Opens up crawl graph or adds the LOAD_URL from the command line / config to insert a new node into the crawl graph
+- Opens up N browsers
+- Crawler queries the crawl graph for UNVISITED paths
+- Returned paths (in order they were found) are then iterated over, executing each entry in the same browser.
+  - A path is a series of navigation steps LOAD URL -> CLICK BTN -> ENTER FORM etc
+- Before crawler executes the last entry of the path, it enables instrumentation to capture new potential navigations
+
+Active Plugins
+
+- Much like the crawler, the Active Plugin System queries the crawl graph for UNAUDITED
 
 ## Browsers
 

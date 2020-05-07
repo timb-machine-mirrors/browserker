@@ -29,15 +29,6 @@ type PromptHandlerFunc func(tab *Tab, message, promptType string)
 // ConsoleMessageFunc function for handling console messages
 type ConsoleMessageFunc func(tab *Tab, message *gcdapi.ConsoleConsoleMessage)
 
-// NetworkRequestHandlerFunc function for handling network requests
-type NetworkRequestHandlerFunc func(tab *Tab, request *NetworkRequest)
-
-// NetworkResponseHandlerFunc function for handling network responses
-type NetworkResponseHandlerFunc func(tab *Tab, response *NetworkResponse)
-
-// NetworkFinishedHandlerFunc function for handling network finished, meaning it's safe to call Network.GetResponseBody
-type NetworkFinishedHandlerFunc func(tab *Tab, requestID string, dataLength, timeStamp float64)
-
 // StorageFunc function for ListenStorageEvents returns the eventType of cleared, updated, removed or added.
 type StorageFunc func(tab *Tab, eventType string, eventDetails *StorageEvent)
 

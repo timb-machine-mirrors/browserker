@@ -12,8 +12,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
-	"gitlab.com/browserker/browserk/inject"
-	"gitlab.com/browserker/browserk/navi"
 
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
@@ -56,7 +54,7 @@ func NewTab(ctx context.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Ta
 		exitCh:       make(chan struct{}),
 		navigationCh: make(chan int),
 	}
-	t.id = browserk.GetBrowserID()
+	t.id = 1 // TODO: generate random or something
 	t.g = gcdBrowser
 	t.eleMutex = &sync.RWMutex{}
 	t.elements = make(map[int]*Element)
@@ -132,7 +130,7 @@ func (t *Tab) ID() int64 {
 	return t.id
 }
 
-func (t *Tab) Find(ctx context.Context, finder navi.Find) (*navi.HTMLElement, error) {
+func (t *Tab) Find(ctx context.Context, finder browserk.Find) (*browserk.HTMLElement, error) {
 	return nil, nil
 }
 
@@ -140,11 +138,11 @@ func (t *Tab) Instrument(opt *browserk.BrowserOpts) error {
 	return nil
 }
 
-func (t *Tab) InjectBefore(ctx context.Context, inject inject.Injector) error {
+func (t *Tab) InjectBefore(ctx context.Context, inject browserk.Injector) error {
 	return nil
 }
 
-func (t *Tab) InjectAfter(ctx context.Context, inject inject.Injector) ([]byte, error) {
+func (t *Tab) InjectAfter(ctx context.Context, inject browserk.Injector) ([]byte, error) {
 	return nil, nil
 }
 

@@ -43,6 +43,7 @@ type Navigation struct {
 	State            NavState    `graph:"state"`         // state of this navigation
 	StateUpdatedTime time.Time   `graph:"state_updated"` // when the state was updated (for timeouts)
 	Action           *Action     `graph:"action"`
+	Scope            Scope       `graph:"scope"`
 	Distance         int         `graph:"dist"`
 }
 
@@ -52,6 +53,7 @@ func NewNavigation(triggeredBy TriggeredBy, action *Action) *Navigation {
 		Action:      action,
 		TriggeredBy: triggeredBy,
 	}
+
 	// TODO: add originID as part of new nav id for uniqueness?
 	n.ID = md5.New().Sum(append(n.Action.Input, byte(n.Action.Type)))
 	return n
@@ -59,11 +61,12 @@ func NewNavigation(triggeredBy TriggeredBy, action *Action) *Navigation {
 
 // NavigationResult captures result details about a navigation
 type NavigationResult struct {
-	ID           []byte `graph:"id"`
-	NavigationID []byte `graph:"nav_id"`
-	RequestID    int64  `graph:"request_id"`
-	DOM          string
-	LoadRequest  *HTTPRequest
-	Requests     map[int64]*HTTPRequest
-	Responses    map[int64]*HTTPResponse
+	ID            []byte `graph:"id"`
+	NavigationID  []byte `graph:"nav_id"`
+	DOM           string
+	StartURL      string
+	EndURL        string
+	LoadRequestID int64
+	Requests      map[int64]*HTTPRequest
+	Responses     map[int64]*HTTPResponse
 }

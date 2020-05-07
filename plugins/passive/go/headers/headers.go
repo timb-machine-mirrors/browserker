@@ -1,5 +1,7 @@
 package headers
 
+import "gitlab.com/browserker/browserk"
+
 type HeaderPlugin struct {
 }
 
@@ -14,14 +16,14 @@ func (h *HeaderPlugin) Name() string {
 
 // ID
 func (h *HeaderPlugin) ID() string {
-	"BR-P-0001"
+	return "BR-P-0001"
 }
 
-func (h *HeaderPlugin) Config() *PluginConfig {
+func (h *HeaderPlugin) Config() *browserk.PluginConfig {
 	return nil
 }
 
-func (h *HeaderPlugin) Options() *PluginOpts {
+func (h *HeaderPlugin) Options() *browserk.PluginOpts {
 	return nil
 }
 
@@ -31,10 +33,10 @@ func (h *HeaderPlugin) Register() error {
 func (h *HeaderPlugin) Unregister() error {
 	return nil
 }
-func (h *HeaderPlugin) Ready(browser Browser) (bool, error) {
+func (h *HeaderPlugin) Ready(browser *browserk.Browser) (bool, error) {
 	return false, nil
 }
 
-func (h *HeaderPlugin) OnEvent(evt PluginEvent, data []byte) {
+func (h *HeaderPlugin) OnEvent(evt *browserk.PluginEvent, data []byte) {
 
 }

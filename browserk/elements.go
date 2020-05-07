@@ -1,4 +1,4 @@
-package navi
+package browserk
 
 type HTMLElementType int16
 
