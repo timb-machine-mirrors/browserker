@@ -21,7 +21,8 @@ const abortIndex int8 = math.MaxInt8 / 2
 
 // Context shared between services, browsers and plugins
 type Context struct {
-	Ctx      *context.Context
+	Ctx      context.Context
+	Auth     AuthService
 	Scope    ScopeService
 	Reporter Reporter
 	Injector Injector

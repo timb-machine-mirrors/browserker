@@ -14,6 +14,10 @@ func New(cfg *browserk.Config) *BrowserkCrawler {
 	return &BrowserkCrawler{cfg: cfg}
 }
 
+func (b *BrowserkCrawler) Init() error {
+	return nil
+}
+
 func (b *BrowserkCrawler) Process(ctx context.Context, browser browserk.Browser, entry *browserk.Navigation) ([]*browserk.NavigationResult, []*browserk.Navigation, error) {
 	switch entry.Action.Type {
 	case browserk.ActLoadURL:

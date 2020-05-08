@@ -1,7 +1,6 @@
 package browserk_test
 
 import (
-	"fmt"
 	"testing"
 
 	"gitlab.com/browserker/browserk"
@@ -14,7 +13,6 @@ func TestContext(t *testing.T) {
 	called := 0
 	for i := 0; i < count; i++ {
 		hnd[i] = func(c *browserk.Context) {
-			fmt.Printf("%d\n", called)
 			called++
 			if called == 3 {
 				c.ReqAbort()
