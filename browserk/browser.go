@@ -41,8 +41,9 @@ type Action struct {
 	Result  []byte     `graph:"result"`
 }
 
+// BrowserPool handles taking/returning browsers
 type BrowserPool interface {
-	Take(ctx context.Context) (Browser, error)
+	Take(ctx *Context) (Browser, error)
 	Return(ctx context.Context, browserPort string)
 }
 

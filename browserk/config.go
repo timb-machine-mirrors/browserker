@@ -16,8 +16,9 @@ const (
 
 type Config struct {
 	URL          string
-	AllowedHosts []string
-	IgnoredHosts []string
+	AllowedURLs  []string // considered 'in scope' for testing/access
+	IgnoredURLs  []string // will access, but not report/run tests against (this is the default for non AllowedURLs)
+	ExcludedURLs []string // will not allow access to
 	DataPath     string
 	AuthScript   string
 	AuthType     AuthType

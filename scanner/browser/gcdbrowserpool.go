@@ -219,22 +219,22 @@ func (b *GCDBrowserPool) closeAndCreateBrowser(port string, doneCh chan struct{}
 	close(doneCh)
 }
 
-// Take a browser, user is responsible for closing tabs they opened.
-func (b *GCDBrowserPool) Take(ctx context.Context) (browserk.Browser, error) {
+// Take a browser
+func (b *GCDBrowserPool) Take(ctx *browserk.Context) (browserk.Browser, error) {
 	var br *gcd.Gcd
 
 	if atomic.LoadInt32(&b.closing) == 1 {
 		return nil, ErrBrowserClosing
 	}
 	// if nil, do not return browser
-	if br = b.Acquire(ctx); br == nil {
+	if br = b.Acquire(ctx.Ctx); br == nil {
 		return nil, errors.New("browser acquisition failed during Take")
 	}
 
-	log.Ctx(ctx).Info().Int32("acquired", atomic.LoadInt32(&b.acquiredBrowsers)).Int32("errors", atomic.LoadInt32(&b.acquireErrors)).Msg("acquired browser")
+	log.Info().Int32("acquired", atomic.LoadInt32(&b.acquiredBrowsers)).Int32("errors", atomic.LoadInt32(&b.acquireErrors)).Msg("acquired browser")
 	t, err := br.GetFirstTab()
 	if err != nil {
-		b.Return(ctx, br.Port())
+		b.Return(ctx.Ctx, br.Port())
 		return nil, fmt.Errorf("failed to aquire valid tab from browser")
 	}
 	gtab := NewTab(ctx, br, t)
@@ -244,7 +244,7 @@ func (b *GCDBrowserPool) Take(ctx context.Context) (browserk.Browser, error) {
 // Return a browser for destruction
 func (b *GCDBrowserPool) Return(ctx context.Context, browserPort string) {
 	startCount := atomic.LoadInt32(&b.startCount) // track if we've restarted so we can throw away bad browsers
-	log.Ctx(ctx).Info().Msg("closing browser")
+	log.Info().Msg("closing browser")
 	b.returnBrowser(ctx, browserPort, startCount)
 	return
 }

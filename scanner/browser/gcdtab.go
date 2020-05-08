@@ -21,6 +21,7 @@ import (
 type Tab struct {
 	g                     *gcd.Gcd
 	t                     *gcd.ChromeTarget
+	ctx                   *browserk.Context
 	container             *Container
 	id                    int64
 	eleMutex              *sync.RWMutex          // locks our elements when added/removed.
@@ -46,9 +47,10 @@ type Tab struct {
 }
 
 // NewTab to use
-func NewTab(ctx context.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Tab {
+func NewTab(ctx *browserk.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Tab {
 	t := &Tab{
 		t:            tab,
+		ctx:          ctx,
 		container:    NewContainer(),
 		crashedCh:    make(chan string),
 		exitCh:       make(chan struct{}),
@@ -752,7 +754,7 @@ func (t *Tab) addNodes(node *gcdapi.DOMNode) {
 // Listens for NodeChangeEvents and crash events, dispatches them accordingly.
 // Calls the user defined domChangeHandler if bound. Updates the lastNodeChangeTime
 // to the current time. If the target crashes or is detached, call the disconnectedHandler.
-func (t *Tab) listenDebuggerEvents(ctx context.Context) {
+func (t *Tab) listenDebuggerEvents(ctx *browserk.Context) {
 	for {
 		select {
 		case nodeChangeEvent := <-t.nodeChange:
@@ -769,7 +771,7 @@ func (t *Tab) listenDebuggerEvents(ctx context.Context) {
 		case <-t.exitCh:
 			log.Info().Msg("exiting...")
 			return
-		case <-ctx.Done():
+		case <-ctx.Ctx.Done():
 			log.Info().Msg("context done exiting...")
 			return
 		}
@@ -932,7 +934,7 @@ func (t *Tab) invalidateChildren(node *gcdapi.DOMNode) {
 	}
 }
 
-func (t *Tab) subscribeBrowserEvents(ctx context.Context, intercept bool) {
+func (t *Tab) subscribeBrowserEvents(ctx *browserk.Context, intercept bool) {
 	t.t.DOM.Enable()
 	t.t.Inspector.Enable()
 	t.t.Page.Enable()
@@ -961,7 +963,7 @@ func (t *Tab) subscribeBrowserEvents(ctx context.Context, intercept bool) {
 		}
 
 		t.t.Security.HandleCertificateErrorWithParams(p)
-		log.Ctx(ctx).Info().Msg("certificate error handled")
+		log.Info().Msg("certificate error handled")
 	})
 
 	// network related events

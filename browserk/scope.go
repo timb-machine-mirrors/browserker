@@ -4,11 +4,11 @@ package browserk
 type Scope int8
 
 const (
-	// In scope
+	// In scope (we attack)
 	In Scope = iota + 1
-	// Out of scope
+	// Out of scope (we do not attack, but access)
 	Out
-	// Excluded from scope
+	// Excluded from scope (we do not access or attack)
 	Excluded
 )
 

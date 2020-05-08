@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
+	"gitlab.com/browserker/browserk"
 )
 
 func (t *Tab) subscribeTargetCrashed() {
@@ -187,7 +188,7 @@ func (t *Tab) subscribeDocumentUpdated() {
 	})
 }
 
-func (t *Tab) subscribeNetworkEvents(ctx context.Context) {
+func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 	t.t.Subscribe("network.loadingFailed", func(target *gcd.ChromeTarget, payload []byte) {
 		log.Info().Msgf("failed: %s\n", string(payload))
 		t.container.DecRequest()
@@ -218,7 +219,7 @@ func (t *Tab) subscribeNetworkEvents(ctx context.Context) {
 		p := message.Params
 		log.Info().Str("request_id", message.Params.RequestId).Msg("waiting")
 
-		timeoutCtx, cancel := context.WithTimeout(ctx, time.Second*60)
+		timeoutCtx, cancel := context.WithTimeout(ctx.Ctx, time.Second*60)
 		defer cancel()
 
 		// log.Info().Str("request_id", p.RequestId).Msg("waiting")
@@ -286,7 +287,7 @@ func (t *Tab) subscribeStorageEvents(storageFn StorageFunc) {
 	})
 }
 
-func (t *Tab) subscribeInterception(ctx context.Context) {
+func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 	t.t.Subscribe("Fetch.requestPaused", func(target *gcd.ChromeTarget, payload []byte) {
 		message := &gcdapi.FetchRequestPausedEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {

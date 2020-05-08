@@ -30,9 +30,11 @@ func (h *HeaderPlugin) Options() *browserk.PluginOpts {
 func (h *HeaderPlugin) Register() error {
 	return nil
 }
+
 func (h *HeaderPlugin) Unregister() error {
 	return nil
 }
+
 func (h *HeaderPlugin) Ready(browser *browserk.Browser) (bool, error) {
 	return false, nil
 }

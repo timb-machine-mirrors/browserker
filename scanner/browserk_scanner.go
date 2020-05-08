@@ -8,6 +8,7 @@ import (
 
 	"gitlab.com/browserker/browserk"
 	"gitlab.com/browserker/scanner/browser"
+	"gitlab.com/browserker/scanner/crawler"
 	"gitlab.com/browserker/scanner/report"
 )
 
@@ -19,8 +20,8 @@ type Browserk struct {
 	reporter    browserk.Reporter
 	browsers    browserk.BrowserPool
 
-	scanContext  context.Context
 	stateMonitor *time.Ticker
+	mainContext  *browserk.Context
 }
 
 // New engine
@@ -36,7 +37,15 @@ func (b *Browserk) SetReporter(reporter browserk.Reporter) *Browserk {
 
 // Init the browsers and stores
 func (b *Browserk) Init(ctx context.Context) error {
-	b.scanContext = ctx
+
+	b.mainContext = &browserk.Context{
+		Ctx:      ctx,
+		Scope:    b.scopeService(),
+		Reporter: b.reporter,
+		Injector: nil,
+		Crawl:    b.crawlGraph,
+		Attack:   b.attackGraph,
+	}
 
 	log.Logger.Info().Msg("initializing attack graph")
 	if err := b.attackGraph.Init(); err != nil {
@@ -58,11 +67,22 @@ func (b *Browserk) Init(ctx context.Context) error {
 	return pool.Init()
 }
 
+func (b *Browserk) scopeService() browserk.ScopeService {
+	allowed := b.cfg.AllowedURLs
+	ignored := b.cfg.IgnoredURLs
+	excluded := b.cfg.ExcludedURLs
+
+	if allowed == nil {
+		allowed = []string{b.cfg.URL}
+	}
+	return NewScopeService(allowed, ignored, excluded)
+}
+
 // Start the browsers
 func (b *Browserk) Start() error {
 	for {
 		select {
-		case <-b.scanContext.Done():
+		case <-b.mainContext.Ctx.Done():
 			log.Info().Msg("scan finished due to context complete")
 			return nil
 		case <-b.stateMonitor.C:
@@ -70,32 +90,29 @@ func (b *Browserk) Start() error {
 			log.Info().Msg("state monitor ping")
 		default:
 			_ = b.crawlGraph.Find(b.scanContext, browserk.NavUnvisited, browserk.NavInProcess, int64(b.cfg.NumBrowsers))
-
 		}
 	}
 	return nil //b.browsers.Load(context.Background(), b.cfg.URL)
 }
 
 func (b *Browserk) processEntries(entries [][]*browserk.Navigation) {
-	/*
-		for i, navs := range entries {
-			browser, err := b.browsers.Take(b.scanContext)
-			if err != nil {
-				return
-			}
-			crawler := crawler.New(b.cfg)
-			if err := crawler.Init(); err != nil {
-				return err
-			}
-
-			for j, nav := range navs {
-				ctx, cancel := context.WithTimeout(b.scanContext, time.Second*45)
-				defer cancel()
-				results, newEntries, err := crawler.Process(ctx, browser, nav)
-			}
-
+	for i, navs := range entries {
+		browser, err := b.browsers.Take(b.scanContext)
+		if err != nil {
+			return
 		}
-	*/
+		crawler := crawler.New(b.cfg)
+		if err := crawler.Init(); err != nil {
+			return err
+		}
+
+		for j, nav := range navs {
+			ctx, cancel := context.WithTimeout(b.scanContext, time.Second*45)
+			defer cancel()
+			results, newEntries, err := crawler.Process(ctx, browser, nav)
+		}
+
+	}
 }
 
 // Stop the browsers

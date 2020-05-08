@@ -61,12 +61,13 @@ func NewNavigation(triggeredBy TriggeredBy, action *Action) *Navigation {
 
 // NavigationResult captures result details about a navigation
 type NavigationResult struct {
-	ID            []byte `graph:"id"`
-	NavigationID  []byte `graph:"nav_id"`
-	DOM           string
-	StartURL      string
-	EndURL        string
-	LoadRequestID int64
-	Requests      map[int64]*HTTPRequest
-	Responses     map[int64]*HTTPResponse
+	ID           []byte        `graph:"res_id"`
+	NavigationID []byte        `graph:"nav_id"`
+	DOM          string        `graph:"dom"`
+	StartURL     string        `graph:"start_url"`
+	EndURL       string        `graph:"end_url"`
+	MessageCount int           `graph:"message_count"`
+	Messages     []HTTPMessage `graph:"messages"`
+	StorageEvts  []byte
+	CookieEvts   []byte
 }
