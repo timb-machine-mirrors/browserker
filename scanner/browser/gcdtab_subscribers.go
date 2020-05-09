@@ -290,7 +290,6 @@ func (t *Tab) subscribeStorageEvents(storageFn StorageFunc) {
 
 func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 	t.t.Subscribe("Fetch.requestPaused", func(target *gcd.ChromeTarget, payload []byte) {
-		log.Info().Msg("Fetch.requestPaused event")
 
 		message := &gcdapi.FetchRequestPausedEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {
@@ -300,12 +299,15 @@ func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 		p := message.Params
 		// we are in a response paused event
 		if p.ResponseHeaders != nil {
+			log.Info().Msg("Fetch.requestPaused Response Event")
+			respParams := &gcdapi.FetchFulfillRequestParams{
+				RequestId:    p.RequestId,
+				ResponseCode: p.ResponseStatusCode,
+			}
 			bodyStr, encoded, err := t.t.Fetch.GetResponseBody(p.RequestId)
 			if err != nil {
 				log.Warn().Err(err).Msg("unable to get body")
-				respParams := &gcdapi.FetchFulfillRequestParams{
-					RequestId: p.RequestId,
-				}
+				respParams.Body = base64.StdEncoding.EncodeToString([]byte(""))
 				t.t.Fetch.FulfillRequestWithParams(respParams)
 				return
 			}
@@ -313,17 +315,19 @@ func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 			modified := GCDFetchResponseToIntercepted(message, bodyStr, encoded)
 
 			ctx.NextResp(t, modified)
-			respParams := &gcdapi.FetchFulfillRequestParams{
-				RequestId: p.RequestId,
-			}
 
 			if modified.Modified.ResponseCode != 0 {
 				respParams.ResponseCode = modified.Modified.ResponseCode
-			} else {
-				respParams.ResponseCode = p.ResponseStatusCode
 			}
+
 			if modified.Modified.Body != nil {
 				respParams.Body = base64.StdEncoding.EncodeToString(modified.Modified.Body)
+			} else {
+				if encoded {
+					respParams.Body = bodyStr
+				} else {
+					respParams.Body = base64.StdEncoding.EncodeToString([]byte(bodyStr))
+				}
 			}
 
 			if modified.Modified.ResponseHeaders != nil {
@@ -334,6 +338,7 @@ func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 			}
 			t.t.Fetch.FulfillRequestWithParams(respParams)
 		} else {
+			log.Info().Msg("Fetch.requestPaused Request Event")
 			// we are in a request paused event
 			modified := GCDFetchRequestToIntercepted(message, t.container)
 			log.Info().Msg("Calling request Hooks")

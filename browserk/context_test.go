@@ -12,7 +12,7 @@ func TestContext(t *testing.T) {
 	hnd := make([]browserk.RequestHandler, count)
 	called := 0
 	for i := 0; i < count; i++ {
-		hnd[i] = func(c *browserk.Context) {
+		hnd[i] = func(c *browserk.Context, b browserk.Browser, i *browserk.InterceptedHTTPRequest) {
 			called++
 			if called == 3 {
 				c.ReqAbort()
@@ -21,7 +21,7 @@ func TestContext(t *testing.T) {
 	}
 
 	c.AddReqHandler(hnd...)
-	c.NextReq()
+	c.NextReq(nil, nil)
 	if called != 3 {
 		t.Fatalf("expected abort to kill at 3, got called: %d\n", called)
 	}
