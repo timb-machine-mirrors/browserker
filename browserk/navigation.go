@@ -3,6 +3,8 @@ package browserk
 import (
 	"crypto/md5"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 // TriggeredBy stores what caused a navigation attempt
@@ -50,12 +52,18 @@ type Navigation struct {
 // NewNavigation type
 func NewNavigation(triggeredBy TriggeredBy, action *Action) *Navigation {
 	n := &Navigation{
-		Action:      action,
-		TriggeredBy: triggeredBy,
+		Action:           action,
+		TriggeredBy:      triggeredBy,
+		State:            NavUnvisited,
+		StateUpdatedTime: time.Now(),
 	}
 
 	// TODO: add originID as part of new nav id for uniqueness?
-	n.ID = md5.New().Sum(append(n.Action.Input, byte(n.Action.Type)))
+	h := md5.New()
+	h.Write(n.Action.Input)
+	h.Write([]byte{byte(n.Action.Type)})
+	n.ID = h.Sum(nil)
+	log.Info().Msgf("NEW ID: %#v", n.ID)
 	return n
 }
 

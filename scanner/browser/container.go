@@ -38,13 +38,42 @@ func (c *Container) SetLoadRequest(request *browserk.HTTPRequest) {
 	c.loadRequestID = request.RequestId
 }
 
-// GetMessages returns all of the http req/resp messages
+func (c *Container) GetRequest(requestID string) *browserk.HTTPRequest {
+	c.messageLock.RLock()
+	m, ok := c.messages[requestID]
+	c.messageLock.RUnlock()
+	if !ok {
+		return nil
+	}
+	return m.Request
+}
+
+func (c *Container) GetResponse(requestID string) *browserk.HTTPResponse {
+	c.messageLock.RLock()
+	m, ok := c.messages[requestID]
+	c.messageLock.RUnlock()
+	if !ok {
+		return nil
+	}
+	return m.Response
+}
+
+func (c *Container) GetMessage(requestID string) *browserk.HTTPMessage {
+	c.messageLock.RLock()
+	m, ok := c.messages[requestID]
+	c.messageLock.RUnlock()
+	if !ok {
+		return nil
+	}
+	return m
+}
+
+// GetMessages returns all of the http req/resp messages and clears the container
 func (c *Container) GetMessages() []*browserk.HTTPMessage {
 	c.messageLock.Lock()
 	defer c.messageLock.Unlock()
 	msgs := make([]*browserk.HTTPMessage, len(c.messages))
 	i := 0
-	log.Info().Msgf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!we have %d messages", len(c.messages))
 	for _, v := range c.messages {
 		if v == nil {
 			continue

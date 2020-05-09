@@ -3,12 +3,13 @@ package store
 import (
 	"bytes"
 
+	"github.com/davecgh/go-spew/spew"
 	badger "github.com/dgraph-io/badger/v2"
 	"gitlab.com/browserker/browserk"
 )
 
 func StateIterator(txn *badger.Txn, byState browserk.NavState, limit int64) ([][]byte, error) {
-	states := make([][]byte, limit)
+	states := make([][]byte, 0)
 	idx := int64(0)
 	it := txn.NewIterator(badger.IteratorOptions{Prefix: []byte("state:")})
 	defer it.Close()
@@ -30,15 +31,21 @@ func StateIterator(txn *badger.Txn, byState browserk.NavState, limit int64) ([][
 		}
 
 		if state == byState {
-			states[idx] = GetID(item.KeyCopy(nil))
+			key := item.KeyCopy(nil)
+			states = append(states, GetID(key))
 			idx++
 		}
+	}
+	spew.Dump(states)
+	// no entries
+	if len(states) == 0 || states[0] == nil {
+		return nil, nil
 	}
 	return states, nil
 }
 
 func IfIterator(txn *badger.Txn, key, value []byte, limit int64) ([][]byte, error) {
-	results := make([][]byte, limit)
+	results := make([][]byte, 0)
 	idx := int64(0)
 	it := txn.NewIterator(badger.IteratorOptions{Prefix: key})
 	defer it.Close()
@@ -55,9 +62,12 @@ func IfIterator(txn *badger.Txn, key, value []byte, limit int64) ([][]byte, erro
 		}
 
 		if bytes.Compare(value, retVal) == 0 {
-			results[idx] = GetID(item.KeyCopy(nil))
+			results = append(results, GetID(item.KeyCopy(nil)))
 			idx++
 		}
+	}
+	if len(results) == 0 || results[0] == nil {
+		return nil, nil
 	}
 	return results, nil
 }

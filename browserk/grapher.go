@@ -15,5 +15,6 @@ type CrawlGrapher interface {
 	Close() error
 	Find(ctx context.Context, byState, setState NavState, limit int64) [][]*Navigation
 	AddNavigation(nav *Navigation) error
+	NavExists(nav *Navigation) bool
 	GetNavigation(id []byte) (*Navigation, error)
 }

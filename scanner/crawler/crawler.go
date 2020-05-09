@@ -3,6 +3,7 @@ package crawler
 import (
 	"context"
 
+	"github.com/davecgh/go-spew/spew"
 	"gitlab.com/browserker/browserk"
 )
 
@@ -18,17 +19,19 @@ func (b *BrowserkCrawler) Init() error {
 	return nil
 }
 
-func (b *BrowserkCrawler) Process(ctx context.Context, browser browserk.Browser, entry *browserk.Navigation) ([]*browserk.NavigationResult, []*browserk.Navigation, error) {
+// Process the next navigation entry
+func (b *BrowserkCrawler) Process(ctx *browserk.Context, browser browserk.Browser, entry *browserk.Navigation, isFinal bool) ([]*browserk.NavigationResult, []*browserk.Navigation, error) {
 	switch entry.Action.Type {
 	case browserk.ActLoadURL:
-		if err := browser.Navigate(ctx, string(entry.Action.Input)); err != nil {
+		if err := browser.Navigate(ctx.Ctx, string(entry.Action.Input)); err != nil {
 			return nil, nil, err
 		}
-
+		spew.Dump(browser.GetMessages())
 	}
 	return nil, nil, nil
 }
 
+// FindNewNav potentials
 func (b *BrowserkCrawler) FindNewNav(ctx context.Context, browser browserk.Browser) []*browserk.Navigation {
 	return nil
 }

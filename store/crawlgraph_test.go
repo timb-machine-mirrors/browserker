@@ -9,6 +9,55 @@ import (
 	"gitlab.com/browserker/store"
 )
 
+func TestCrawlNavExists(t *testing.T) {
+	os.RemoveAll("testdata/crawl")
+	g := store.NewCrawlGraph("testdata/crawl")
+	if err := g.Init(); err != nil {
+		t.Fatalf("error init graph: %s\n", err)
+	}
+	defer g.Close()
+
+	nav := testMakeNavi([]byte{0, 1, 2})
+	nav.OriginID = []byte{}
+	if err := g.AddNavigation(nav); err != nil {
+		t.Fatalf("error adding: %s\n", err)
+	}
+	if !g.NavExists(nav) {
+		t.Fatalf("nav should have existed")
+	}
+
+	nonExist := testMakeNavi([]byte{0, 2, 2})
+	if g.NavExists(nonExist) {
+		t.Fatalf("nav should NOT existed")
+	}
+}
+
+func TestCrawlOpenClose(t *testing.T) {
+	os.RemoveAll("testdata/oc")
+	g := store.NewCrawlGraph("testdata/oc")
+	if err := g.Init(); err != nil {
+		t.Fatalf("error init graph: %s\n", err)
+	}
+	defer g.Close()
+	nav := testMakeNavi([]byte{0, 1, 2})
+	nav.OriginID = []byte{}
+	if err := g.AddNavigation(nav); err != nil {
+		t.Fatalf("error adding: %s\n", err)
+	}
+	if !g.NavExists(nav) {
+		t.Fatalf("nav should have existed")
+	}
+	g.Close()
+
+	g = store.NewCrawlGraph("testdata/oc")
+	if err := g.Init(); err != nil {
+		t.Fatalf("error init graph: %s\n", err)
+	}
+	if !g.NavExists(nav) {
+		t.Fatalf("nav should have existed")
+	}
+}
+
 func TestCrawlGraph(t *testing.T) {
 	os.RemoveAll("testdata/crawl")
 	g := store.NewCrawlGraph("testdata/crawl")

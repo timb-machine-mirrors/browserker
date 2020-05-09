@@ -45,6 +45,8 @@ type Action struct {
 type BrowserPool interface {
 	Take(ctx *Context) (Browser, error)
 	Return(ctx context.Context, browserPort string)
+	Leased() int
+	Shutdown() error
 }
 
 // BrowserOpts todo: define
@@ -58,8 +60,6 @@ type Browser interface {
 	Navigate(ctx context.Context, url string) (err error)
 	Find(ctx context.Context, finder Find) (*HTMLElement, error)
 	Instrument(opt *BrowserOpts) error
-	InjectBefore(ctx context.Context, inject Injector) error
-	InjectAfter(ctx context.Context, inject Injector) ([]byte, error)
 	GetMessages() ([]*HTTPMessage, error)
 	Screenshot(ctx context.Context) (string, error)
 	Execute(ctx context.Context, act map[int]*Action) error

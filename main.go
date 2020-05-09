@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -10,7 +11,7 @@ import (
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "Simple Scanner"
+	app.Name = "Browserker Web App Scanner"
 	app.Version = "0.1"
 	app.Authors = []*cli.Author{{Name: "isaac dawson", Email: "isaac.dawson@gmail.com"}}
 	app.Usage = "Run some DAST goodness baby!"
@@ -30,6 +31,7 @@ func main() {
 			Flags:   clicmds.CrawlerFlags(),
 		},
 	}
+	fmt.Println(os.Args)
 	err := app.Run(os.Args)
 	if err != nil {
 		log.Fatal(err)

@@ -41,7 +41,7 @@ type Tab struct {
 	navigationTimeout     time.Duration          // amount of time to wait before failing navigation
 	elementTimeout        time.Duration          // amount of time to wait for element readiness
 	stabilityTimeout      time.Duration          // amount of time to give up waiting for stability
-	stableAfter           time.Duration          // amount of time of no activity to consIDer the DOM stable
+	stableAfter           time.Duration          // amount of time of no activity to consider the DOM stable
 	lastNodeChangeTimeVal atomic.Value           // timestamp of when the last node change occurred atomic because multiple go routines will modify
 	domChangeHandler      DomChangeHandlerFunc   // allows the caller to be notified of DOM change events.
 }
@@ -99,7 +99,7 @@ func (t *Tab) Navigate(ctx context.Context, url string) error {
 
 	t.setIsNavigating(true)
 	defer t.setIsNavigating(false)
-
+	log.Debug().Msgf("navigating to %s", url)
 	navParams := &gcdapi.PageNavigateParams{Url: url, TransitionType: "typed"}
 	_, _, errText, err := t.t.Page.NavigateWithParams(navParams)
 	if err != nil {
@@ -111,8 +111,8 @@ func (t *Tab) Navigate(ctx context.Context, url string) error {
 	}
 
 	t.lastNodeChangeTimeVal.Store(time.Now())
-
-	return t.waitReady(ctx, time.Second*9)
+	log.Debug().Msgf("waiting ready for %s", url)
+	return t.waitReady(ctx, t.stableAfter)
 }
 
 // IsShuttingDown answers if we are shutting down or not
@@ -138,14 +138,6 @@ func (t *Tab) Find(ctx context.Context, finder browserk.Find) (*browserk.HTMLEle
 
 func (t *Tab) Instrument(opt *browserk.BrowserOpts) error {
 	return nil
-}
-
-func (t *Tab) InjectBefore(ctx context.Context, inject browserk.Injector) error {
-	return nil
-}
-
-func (t *Tab) InjectAfter(ctx context.Context, inject browserk.Injector) ([]byte, error) {
-	return nil, nil
 }
 
 func (t *Tab) GetMessages() ([]*browserk.HTTPMessage, error) {
@@ -202,8 +194,8 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 	defer ticker.Stop()
 
 	navTimer := time.After(45 * time.Second)
-	//log.Ctx(ctx).Info().Msg("waiting for nav to complete")
 	// wait navigation to complete.
+	log.Info().Msg("waiting for nav to complete")
 	select {
 	case <-navTimer:
 		return ErrNavigationTimedOut
@@ -219,7 +211,7 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 	stableTimer := time.After(5 * time.Second)
 
 	// wait for DOM & network stability
-	//log.Ctx(ctx).Info().Msg("waiting for DOM & network stability")
+	log.Info().Msg("waiting for nav stability complete")
 	for {
 		select {
 		case reason := <-t.crashedCh:
@@ -229,14 +221,14 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 		case <-t.exitCh:
 			return ErrTabClosing
 		case <-stableTimer:
-			log.Ctx(ctx).Info().Msg("stability timed out")
+			log.Info().Msg("stability timed out")
 			return ErrTimedOut
 		case <-ticker.C:
 			if changeTime, ok := t.lastNodeChangeTimeVal.Load().(time.Time); ok {
-				//log.Info().Int32("requests", t.container.OpenRequestCount()).Msgf("tick %s", time.Now().Sub(changeTime))
+				log.Info().Int32("requests", t.container.OpenRequestCount()).Msgf("tick %s >= %s", time.Now().Sub(changeTime), stableAfter)
 				if time.Now().Sub(changeTime) >= stableAfter && t.container.OpenRequestCount() == 0 {
 					// times up, should be stable now
-					log.Ctx(ctx).Info().Msg("stable")
+					log.Info().Msg("stable")
 					return nil
 				}
 			}
@@ -758,12 +750,12 @@ func (t *Tab) listenDebuggerEvents(ctx *browserk.Context) {
 	for {
 		select {
 		case nodeChangeEvent := <-t.nodeChange:
+			t.lastNodeChangeTimeVal.Store(time.Now())
 			t.handleNodeChange(nodeChangeEvent)
 			// if the caller registered a dom change listener, call it
 			if t.domChangeHandler != nil {
 				t.domChangeHandler(t, nodeChangeEvent)
 			}
-			t.lastNodeChangeTimeVal.Store(time.Now())
 		case reason := <-t.crashedCh:
 			if t.disconnectedHandler != nil {
 				go t.disconnectedHandler(t, reason)

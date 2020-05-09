@@ -1,10 +1,12 @@
 package plugin
 
+import "gitlab.com/browserker/browserk"
+
 type EventDispatcher struct {
 	eventCh chan struct{}
 }
 
-func NewEventDispatcher() &EventDispatcher {
+func NewEventDispatcher() *EventDispatcher {
 	return &EventDispatcher{}
 }
 

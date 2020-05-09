@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/davecgh/go-spew/spew"
+	"gitlab.com/browserker/browserk"
+	"gitlab.com/browserker/mock"
 	"gitlab.com/browserker/scanner/browser"
 	"golang.org/x/net/context"
 )
@@ -36,11 +38,47 @@ func TestStartBrowsers(t *testing.T) {
 	defer leaser.Cleanup()
 
 	ctx := context.Background()
-	b, err := pool.Take(ctx)
+	bCtx := mock.Context(ctx)
+	b, err := pool.Take(bCtx)
 	if err != nil {
 		t.Fatalf("error taking browser: %s\n", err)
 	}
-	b.Navigate(ctx, "http://example.com")
+
+	err = b.Navigate(ctx, "http://example.com")
+	if err != nil {
+		t.Fatalf("error getting url %s\n", err)
+	}
+
+	msgs, _ := b.GetMessages()
+	spew.Dump(msgs)
+}
+
+func TestHookRequests(t *testing.T) {
+	pool := browser.NewGCDBrowserPool(1, leaser)
+	if err := pool.Init(); err != nil {
+		t.Fatalf("failed to init pool")
+	}
+	defer leaser.Cleanup()
+
+	ctx := context.Background()
+	bCtx := mock.Context(ctx)
+
+	hook := func(c *browserk.Context, b browserk.Browser, i *browserk.InterceptedHTTPRequest) {
+		t.Logf("inside hook!")
+		i.Modified.Url = "http://example.com"
+	}
+	bCtx.AddReqHandler([]browserk.RequestHandler{hook}...)
+
+	b, err := pool.Take(bCtx)
+	if err != nil {
+		t.Fatalf("error taking browser: %s\n", err)
+	}
+
+	err = b.Navigate(ctx, "http://example.com")
+	if err != nil {
+		t.Fatalf("error getting url %s\n", err)
+	}
+
 	msgs, _ := b.GetMessages()
 	spew.Dump(msgs)
 }
@@ -52,17 +90,21 @@ func TestGcdWindows(t *testing.T) {
 	}
 	defer leaser.Cleanup()
 	ctx := context.Background()
-
+	bCtx := mock.Context(ctx)
 	p, srv := testServer()
 	defer srv.Shutdown(ctx)
 
 	url := fmt.Sprintf("http://localhost:%s/window_main.html", p)
 
-	b, err := pool.Take(ctx)
+	b, err := pool.Take(bCtx)
 	if err != nil {
 		t.Fatalf("error taking browser: %s\n", err)
 	}
-	b.Navigate(ctx, url)
+
+	err = b.Navigate(ctx, url)
+	if err != nil {
+		t.Fatalf("error getting url %s\n", err)
+	}
 	msgs, _ := b.GetMessages()
 	spew.Dump(msgs)
 }

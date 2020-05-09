@@ -5,6 +5,7 @@
 - Starts up with configuration.
 - Opens up crawl graph or adds the LOAD_URL from the command line / config to insert a new node into the crawl graph
 - Opens up N browsers
+- Create browserk.Context with all necessary services and handlers for various hooks (Pre-Auth hook etc)
 - Crawler queries the crawl graph for UNVISITED paths
 - Returned paths (in order they were found) are then iterated over, executing each entry in the same browser.
   - A path is a series of navigation steps LOAD URL -> CLICK BTN -> ENTER FORM etc
@@ -13,6 +14,10 @@
 Active Plugins
 
 - Much like the crawler, the Active Plugin System queries the crawl graph for UNAUDITED
+
+## Uniqueness
+
+URLs are meaningless for some things, but not others
 
 ## Browsers
 

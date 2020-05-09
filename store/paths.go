@@ -27,21 +27,17 @@ func PathToNavIDs(txn *badger.Txn, predicates []*NavGraphField, nodeIDs [][]byte
 		if err := WalkOrigin(txn, predicates, &entries[idx], nodeID); err != nil {
 			return nil, err
 		}
-		log.Info().Msgf("Before Reverse: %d", len(entries[idx]))
 		// reverse the entries so we can crawl start to finish
 		for i := len(entries[idx])/2 - 1; i >= 0; i-- {
 			opp := len(entries[idx]) - 1 - i
 			entries[idx][i], entries[idx][opp] = entries[idx][opp], entries[idx][i]
 		}
-		log.Info().Msgf("After Reverse: %d", len(entries[idx]))
-
 	}
 	return entries, nil
 }
 
 // WalkOrigin recursively walks back from a nodeID until we are at the root of the nav graph
 func WalkOrigin(txn *badger.Txn, predicates []*NavGraphField, entries *[]*browserk.Navigation, nodeID []byte) error {
-	log.Info().Msgf("WalkOrigin: %v", nodeID)
 	if nodeID == nil || len(nodeID) == 0 {
 		log.Info().Msgf("nodeID was nil")
 		return nil

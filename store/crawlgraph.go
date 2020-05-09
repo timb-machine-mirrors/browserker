@@ -1,6 +1,7 @@
 package store
 
 import (
+	"bytes"
 	"context"
 	"os"
 	"reflect"
@@ -85,6 +86,32 @@ func (g *CrawlGraph) AddNavigation(nav *browserk.Navigation) error {
 	})
 }
 
+// NavExists check
+func (g *CrawlGraph) NavExists(nav *browserk.Navigation) bool {
+	var exist bool
+	g.GraphStore.View(func(txn *badger.Txn) error {
+		key := MakeKey(nav.ID, "state")
+		value, _ := EncodeState(nav.State)
+
+		item, err := txn.Get(key)
+		if err == badger.ErrKeyNotFound {
+			log.Error().Err(err).Msg("failed to find node id state")
+			return nil
+		}
+
+		retVal, err := item.ValueCopy(nil)
+		if err != nil {
+			return err
+		}
+
+		if bytes.Compare(value, retVal) == 0 {
+			exist = true
+		}
+		return nil
+	})
+	return exist
+}
+
 // GetNavigation by the provided id value
 func (g *CrawlGraph) GetNavigation(id []byte) (*browserk.Navigation, error) {
 	exist := &browserk.Navigation{}
@@ -113,6 +140,11 @@ func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserk.NavSta
 			if err != nil {
 				return err
 			}
+			if nodeIDs == nil {
+				log.Info().Msgf("No new nodeIDs")
+				return nil
+			}
+			log.Info().Msgf("Found new nodeIDs for nav, getting paths: %#v", nodeIDs)
 			entries, err = PathToNavIDs(txn, g.navPredicates, nodeIDs)
 			return err
 		})
@@ -125,6 +157,11 @@ func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserk.NavSta
 			nodeIDs, err := StateIterator(txn, byState, limit)
 			if err != nil {
 				return err
+			}
+
+			if nodeIDs == nil {
+				log.Info().Msgf("No new nodeIDs")
+				return nil
 			}
 
 			err = UpdateState(txn, setState, nodeIDs)

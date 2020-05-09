@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
@@ -204,9 +203,11 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		t.container.IncRequest()
 
 		if message.Params.Type == "Document" {
+			log.Info().Str("request_id", message.Params.RequestId).Msg("is Document request")
 			t.container.SetLoadRequest(req)
 		}
 		t.container.AddRequest(req)
+		log.Info().Str("request_id", message.Params.RequestId).Msg("added request")
 	})
 
 	t.t.Subscribe("Network.responseReceived", func(target *gcd.ChromeTarget, payload []byte) {
@@ -236,9 +237,9 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 			body, _ = base64.StdEncoding.DecodeString(bodyStr)
 		}
 		log.Info().Msg("adding response w/body to container")
-		spew.Dump(body)
-
 		t.container.AddResponse(GCDResponseToBrowserk(message, body))
+		log.Info().Msg("added")
+
 	})
 
 	t.t.Subscribe("Network.loadingFinished", func(target *gcd.ChromeTarget, payload []byte) {
@@ -289,36 +290,73 @@ func (t *Tab) subscribeStorageEvents(storageFn StorageFunc) {
 
 func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 	t.t.Subscribe("Fetch.requestPaused", func(target *gcd.ChromeTarget, payload []byte) {
+		log.Info().Msg("Fetch.requestPaused event")
+
 		message := &gcdapi.FetchRequestPausedEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {
 			log.Fatal().Err(err).Msg("critical error Fetch.requestPaused event was unable to decode")
 		}
 
 		p := message.Params
+		// we are in a response paused event
 		if p.ResponseHeaders != nil {
 			bodyStr, encoded, err := t.t.Fetch.GetResponseBody(p.RequestId)
 			if err != nil {
-				log.Info().Err(err).Msg("error fetch GetResponseBody")
-			} else {
-				body := []byte(bodyStr)
-				if encoded {
-					body, _ = base64.StdEncoding.DecodeString(bodyStr)
+				log.Warn().Err(err).Msg("unable to get body")
+				respParams := &gcdapi.FetchFulfillRequestParams{
+					RequestId: p.RequestId,
 				}
-				t.t.Fetch.FulfillRequestWithParams(&gcdapi.FetchFulfillRequestParams{
-					RequestId:    p.RequestId,
-					ResponseCode: 200,
-					Body:         base64.StdEncoding.EncodeToString(body),
-				})
+				t.t.Fetch.FulfillRequestWithParams(respParams)
+				return
 			}
 
-			log.Info().Msg("ContinueRequestWithParams REQUEST DATA")
-			//time.Sleep(5 * time.Second)
-			t.t.Fetch.ContinueRequestWithParams(&gcdapi.FetchContinueRequestParams{
-				RequestId: p.RequestId,
-				Url:       p.Request.Url,
-				Method:    p.Request.Method,
-			})
+			modified := GCDFetchResponseToIntercepted(message, bodyStr, encoded)
 
+			ctx.NextResp(t, modified)
+			respParams := &gcdapi.FetchFulfillRequestParams{
+				RequestId: p.RequestId,
+			}
+
+			if modified.Modified.ResponseCode != 0 {
+				respParams.ResponseCode = modified.Modified.ResponseCode
+			} else {
+				respParams.ResponseCode = p.ResponseStatusCode
+			}
+			if modified.Modified.Body != nil {
+				respParams.Body = base64.StdEncoding.EncodeToString(modified.Modified.Body)
+			}
+
+			if modified.Modified.ResponseHeaders != nil {
+				respParams.ResponseHeaders = modified.Modified.ResponseHeaders
+			}
+			if modified.Modified.ResponsePhrase != "" {
+				respParams.ResponsePhrase = modified.Modified.ResponsePhrase
+			}
+			t.t.Fetch.FulfillRequestWithParams(respParams)
+		} else {
+			// we are in a request paused event
+			modified := GCDFetchRequestToIntercepted(message, t.container)
+			log.Info().Msg("Calling request Hooks")
+			ctx.NextReq(t, modified)
+
+			reqParams := &gcdapi.FetchContinueRequestParams{
+				RequestId: modified.RequestId,
+			}
+
+			if modified.Modified.Method != "" {
+				reqParams.Method = modified.Modified.Method
+			}
+			if modified.Modified.Url != "" {
+				reqParams.Url = modified.Modified.Url
+			}
+			if modified.Modified.Headers != nil {
+				reqParams.Headers = modified.Modified.Headers
+			}
+			if modified.Modified.PostData != "" {
+				reqParams.PostData = modified.Modified.PostData
+			}
+			t.t.Fetch.ContinueRequestWithParams(reqParams)
 		}
+
 	})
 }

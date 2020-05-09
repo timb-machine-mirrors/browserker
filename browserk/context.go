@@ -6,28 +6,29 @@ import (
 )
 
 // RequestHandler for adding middleware between browser HTTP Request events
-type RequestHandler func(c *Context)
+type RequestHandler func(c *Context, browser Browser, i *InterceptedHTTPRequest)
 
 // ResponseHandler for adding middleware between browser HTTP Response events
-type ResponseHandler func(c *Context)
+type ResponseHandler func(c *Context, browser Browser, i *InterceptedHTTPResponse)
 
 // EventHandler for adding middleware between browser events
 type EventHandler func(c *Context)
 
-// JSHandler for adding middleware between browser events
+// JSHandler for adding middleware to exec JS before/after navigations
 type JSHandler func(c *Context)
 
 const abortIndex int8 = math.MaxInt8 / 2
 
 // Context shared between services, browsers and plugins
 type Context struct {
-	Ctx      context.Context
-	Auth     AuthService
-	Scope    ScopeService
-	Reporter Reporter
-	Injector Injector
-	Crawl    CrawlGrapher
-	Attack   AttackGrapher
+	Ctx         context.Context
+	CtxComplete func()
+	Auth        AuthService
+	Scope       ScopeService
+	Reporter    Reporter
+	Injector    Injector
+	Crawl       CrawlGrapher
+	Attack      AttackGrapher
 
 	jsBeforeHandler []JSHandler
 	jsBeforeIndex   int8
@@ -45,9 +46,11 @@ type Context struct {
 	evtIndex    int8
 }
 
+// Copy the context services and handlers, but not indexes
 func (c *Context) Copy() *Context {
 	return &Context{
 		Ctx:             c.Ctx,
+		CtxComplete:     c.CtxComplete,
 		Scope:           c.Scope,
 		Reporter:        c.Reporter,
 		Injector:        c.Injector,
@@ -67,9 +70,9 @@ func (c *Context) Copy() *Context {
 }
 
 // NextReq calls the next handler
-func (c *Context) NextReq() {
+func (c *Context) NextReq(browser Browser, i *InterceptedHTTPRequest) {
 	for c.reqIndex < int8(len(c.reqHandlers)) {
-		c.reqHandlers[c.reqIndex](c)
+		c.reqHandlers[c.reqIndex](c, browser, i)
 		c.reqIndex++
 	}
 }
@@ -94,9 +97,9 @@ func (c *Context) ReqAbort() {
 }
 
 // NextResp calls the next handler
-func (c *Context) NextResp() {
+func (c *Context) NextResp(browser Browser, i *InterceptedHTTPResponse) {
 	for c.respIndex < int8(len(c.respHandlers)) {
-		c.respHandlers[c.respIndex](c)
+		c.respHandlers[c.respIndex](c, browser, i)
 		c.respIndex++
 	}
 

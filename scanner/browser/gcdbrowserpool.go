@@ -18,9 +18,6 @@ var startupFlags = []string{
 	"--enable-automation",
 	"--enable-features=NetworkService",
 	"--test-type",
-	//"--ignore-certificate-errors",
-	//"--ignore-ssl-errors",
-	//"--ignore-certificate-errors-spki-list",
 	"--disable-client-side-phishing-detection",
 	"--disable-component-update",
 	"--disable-infobars",
@@ -37,14 +34,13 @@ var startupFlags = []string{
 	"--disable-features=TranslateUI",
 	"--disable-gpu",
 	"--disable-dev-shm-usage",
-	"--no-sandbox",
-	//"--metrics-recording-only",
+	//"--no-sandbox",
 	"--allow-running-insecure-content",
 	"--no-first-run",
 	"--window-size=1024,768",
 	"--safebrowsing-disable-auto-update",
 	"--safebrowsing-disable-download-protection",
-	//"--deterministic-fetch",
+	"--deterministic-fetch",
 
 	"--password-store=basic",
 	//"--proxy-server=localhost:8080",
@@ -271,4 +267,16 @@ func (b *GCDBrowserPool) Close(ctx context.Context) error {
 			return nil
 		}
 	}
+}
+
+// Leased returns the number of open/active browsers
+func (b *GCDBrowserPool) Leased() int {
+	return int(atomic.LoadInt32(&b.acquiredBrowsers))
+}
+
+// Shutdown kills browsers
+func (b *GCDBrowserPool) Shutdown() error {
+	atomic.CompareAndSwapInt32(&b.closing, 0, 1)
+	_, err := b.leaser.Cleanup()
+	return err
 }

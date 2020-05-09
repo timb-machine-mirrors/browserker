@@ -2,6 +2,9 @@ package clicmds
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
@@ -45,6 +48,7 @@ func Crawler(ctx *cli.Context) error {
 		},
 		NumBrowsers: 3,
 	}
+	os.RemoveAll(ctx.String("datadir"))
 	crawl := store.NewCrawlGraph(ctx.String("datadir") + "/crawl")
 	attack := store.NewAttackGraph(ctx.String("datadir") + "/attack")
 	browserk := scanner.New(cfg, crawl, attack)
@@ -55,5 +59,23 @@ func Crawler(ctx *cli.Context) error {
 		log.Logger.Error().Err(err).Msg("failed to init engine")
 		return err
 	}
-	return browserk.Start()
+
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		log.Info().Msg("Ctrl-C Pressed, shutting down")
+		err := browserk.Stop()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to stop browserk")
+		}
+		os.Exit(1)
+	}()
+
+	err := browserk.Start()
+	if err != nil {
+		log.Error().Err(err).Msg("browserk failure occurred")
+	}
+
+	return browserk.Stop()
 }

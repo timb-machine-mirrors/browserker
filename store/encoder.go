@@ -25,7 +25,7 @@ func MakeKey(id []byte, predicate string) []byte {
 
 // GetID of key from a pred:key
 func GetID(key []byte) []byte {
-	split := bytes.Split(key, []byte(":"))
+	split := bytes.SplitN(key, []byte(":"), 2)
 	if len(split) == 1 {
 		return []byte{}
 	}
@@ -34,7 +34,7 @@ func GetID(key []byte) []byte {
 
 // GetPredicate from pred:key
 func GetPredicate(key []byte) []byte {
-	split := bytes.Split(key, []byte(":"))
+	split := bytes.SplitN(key, []byte(":"), 2)
 	return split[0]
 }
 
@@ -123,6 +123,13 @@ func DecodeNavigationItem(item *badger.Item, nav *browserk.Navigation, pred stri
 			var v int
 			err := msgpack.Unmarshal(val, &v)
 			nav.Distance = v
+			return err
+		})
+	case "scope":
+		err = item.Value(func(val []byte) error {
+			var v browserk.Scope
+			err := msgpack.Unmarshal(val, &v)
+			nav.Scope = v
 			return err
 		})
 	case "action":

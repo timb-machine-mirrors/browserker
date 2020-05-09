@@ -16,3 +16,7 @@ func (s *Service) Init() error {
 func (s *Service) Login(c *browserk.Context) {
 
 }
+
+func (s *Service) MustLogin() bool {
+	return false
+}

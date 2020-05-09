@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
 	"gitlab.com/browserker/browserk"
@@ -214,5 +215,69 @@ func GCDResponseToBrowserk(resp *gcdapi.NetworkResponseReceivedEvent, body []byt
 		FrameId:   p.FrameId,
 		Body:      body,
 		BodyHash:  h.Sum(nil),
+	}
+}
+
+func GCDFetchRequestToIntercepted(m *gcdapi.FetchRequestPausedEvent, container *Container) *browserk.InterceptedHTTPRequest {
+	p := m.Params
+	r := container.GetRequest(p.RequestId)
+	req := &gcdapi.NetworkRequest{}
+	if r != nil {
+		req = r.Request
+	}
+	headers := make([]*gcdapi.FetchHeaderEntry, 0)
+	if p.Request != nil && p.Request.Headers != nil {
+		for k, v := range p.Request.Headers {
+			switch rv := v.(type) {
+			case string:
+				headers = append(headers, &gcdapi.FetchHeaderEntry{Name: k, Value: rv})
+			case []string:
+				for _, value := range rv {
+					headers = append(headers, &gcdapi.FetchHeaderEntry{Name: k, Value: value})
+				}
+			case nil:
+				headers = append(headers, &gcdapi.FetchHeaderEntry{Name: k, Value: ""})
+			default:
+				log.Warn().Str("header_name", k).Msg("unable to encode header value")
+			}
+		}
+	}
+
+	return &browserk.InterceptedHTTPRequest{
+		RequestId:      p.RequestId,
+		Request:        req,
+		FrameId:        p.FrameId,
+		ResourceType:   p.ResourceType,
+		RequestHeaders: headers,
+		NetworkId:      p.NetworkId,
+		Modified: &browserk.HTTPModifiedRequest{
+			RequestId: "",
+			Url:       "",
+			Method:    "",
+			PostData:  "",
+			Headers:   nil,
+		},
+	}
+}
+
+func GCDFetchResponseToIntercepted(m *gcdapi.FetchRequestPausedEvent, body string, encoded bool) *browserk.InterceptedHTTPResponse {
+	p := m.Params
+	return &browserk.InterceptedHTTPResponse{
+		RequestId:           p.RequestId,
+		Request:             p.Request,
+		FrameId:             p.FrameId,
+		ResourceType:        p.ResourceType,
+		NetworkId:           p.NetworkId,
+		ResponseErrorReason: p.ResponseErrorReason,
+		ResponseHeaders:     p.ResponseHeaders,
+		ResponseStatusCode:  p.ResponseStatusCode,
+		Body:                body,
+		BodyEncoded:         encoded,
+		Modified: &browserk.HTTPModifiedResponse{
+			ResponseCode:    0,
+			ResponseHeaders: nil,
+			Body:            nil,
+			ResponsePhrase:  "",
+		},
 	}
 }
