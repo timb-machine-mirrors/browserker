@@ -87,7 +87,7 @@ func (b *BrowserkCrawler) buildResult(result *browserk.NavigationResult, start t
 
 // FindNewNav potentials
 func (b *BrowserkCrawler) FindNewNav(ctx context.Context, result *browserk.NavigationResult, browser browserk.Browser) []*browserk.Navigation {
-	// TODO: Parse HTML
+	//formElements, err := browser.Find(ctx, browserk.FORM)
 
 	// pull out links
 

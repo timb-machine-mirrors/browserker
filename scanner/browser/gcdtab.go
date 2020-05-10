@@ -173,7 +173,7 @@ func (t *Tab) ID() int64 {
 }
 
 // Find an element by a browserk.Find type
-func (t *Tab) Find(ctx context.Context, finder browserk.Find) (*browserk.HTMLElement, error) {
+func (t *Tab) Find(ctx context.Context, finder browserk.Find) ([]*browserk.HTMLElement, error) {
 	return nil, nil
 }
 
@@ -504,12 +504,12 @@ func (t *Tab) GetDocument() (*Element, error) {
 	return docEle, nil
 }
 
-// GetElementByNodeID returns either an element from our list of ready/known nodeIDs or a new un-ready element
+// getElementByNodeID returns either an element from our list of ready/known nodeIDs or a new un-ready element
 // If it's not ready we return false. Note this does have a sIDe effect of adding a potentially
 // invalID element to our list of known elements. But it is assumed this method will be called
 // with a valID nodeID that chrome has not informed us about yet. Once we are informed, we need
 // to update it via our list and not some reference that could disappear.
-func (t *Tab) GetElementByNodeID(nodeID int) (*Element, bool) {
+func (t *Tab) getElementByNodeID(nodeID int) (*Element, bool) {
 	t.eleMutex.RLock()
 	ele, ok := t.elements[nodeID]
 	t.eleMutex.RUnlock()
@@ -529,7 +529,7 @@ func (t *Tab) GetElementByLocation(x, y int) (*Element, error) {
 	if err != nil {
 		return nil, err
 	}
-	ele, _ := t.GetElementByNodeID(nodeID)
+	ele, _ := t.getElementByNodeID(nodeID)
 	return ele, nil
 }
 
@@ -566,7 +566,7 @@ func (t *Tab) GetDocumentElementByID(docNodeID int, attributeID string) (*Elemen
 	if err != nil {
 		return nil, false, err
 	}
-	ele, ready := t.GetElementByNodeID(nodeID)
+	ele, ready := t.getElementByNodeID(nodeID)
 	return ele, ready, nil
 }
 
@@ -603,7 +603,7 @@ func (t *Tab) GetChildrensCharacterData(element *Element) string {
 
 func (t *Tab) recursivelyGetChildren(children []*gcdapi.DOMNode, elements *[]*Element, tagType string) {
 	for _, child := range children {
-		ele, ready := t.GetElementByNodeID(child.NodeId)
+		ele, ready := t.getElementByNodeID(child.NodeId)
 		// only add if it's ready and tagType matches or tagType is *
 		if ready == true && (tagType == "*" || tagType == ele.nodeName) {
 			*elements = append(*elements, ele)
@@ -630,7 +630,7 @@ func (t *Tab) GetDocumentElementsBySelector(docNodeID int, selector string) ([]*
 	elements := make([]*Element, len(nodeIDs))
 
 	for k, nodeID := range nodeIDs {
-		elements[k], _ = t.GetElementByNodeID(nodeID)
+		elements[k], _ = t.getElementByNodeID(nodeID)
 	}
 
 	return elements, nil
@@ -662,7 +662,7 @@ func (t *Tab) GetElementsBySearch(selector string, includeUserAgentShadowDOM boo
 	elements := make([]*Element, len(nodeIDs))
 
 	for k, nodeID := range nodeIDs {
-		elements[k], _ = t.GetElementByNodeID(nodeID)
+		elements[k], _ = t.getElementByNodeID(nodeID)
 	}
 
 	return elements, nil
@@ -890,7 +890,7 @@ func (t *Tab) handleSetChildNodes(parentNodeID int, nodes []*gcdapi.DOMNode) {
 	for _, node := range nodes {
 		t.addNodes(node)
 	}
-	parent, ok := t.GetElementByNodeID(parentNodeID)
+	parent, ok := t.getElementByNodeID(parentNodeID)
 	if ok {
 		if err := parent.WaitForReady(); err == nil {
 			parent.addChildren(nodes)
@@ -908,7 +908,7 @@ func (t *Tab) handleChildNodeInserted(parentNodeID int, node *gcdapi.DOMNode) {
 	}
 	t.addNodes(node)
 
-	parent, _ := t.GetElementByNodeID(parentNodeID)
+	parent, _ := t.getElementByNodeID(parentNodeID)
 	// make sure we have the parent before we add children
 	if err := parent.WaitForReady(); err == nil {
 		parent.addChild(node)
