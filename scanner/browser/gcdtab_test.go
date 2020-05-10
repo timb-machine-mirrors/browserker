@@ -39,7 +39,7 @@ func TestStartBrowsers(t *testing.T) {
 
 	ctx := context.Background()
 	bCtx := mock.Context(ctx)
-	b, err := pool.Take(bCtx)
+	b, _, err := pool.Take(bCtx)
 	if err != nil {
 		t.Fatalf("error taking browser: %s\n", err)
 	}
@@ -69,7 +69,7 @@ func TestHookRequests(t *testing.T) {
 	}
 	bCtx.AddReqHandler([]browserk.RequestHandler{hook}...)
 
-	b, err := pool.Take(bCtx)
+	b, _, err := pool.Take(bCtx)
 	if err != nil {
 		t.Fatalf("error taking browser: %s\n", err)
 	}
@@ -96,7 +96,7 @@ func TestGcdWindows(t *testing.T) {
 
 	url := fmt.Sprintf("http://localhost:%s/window_main.html", p)
 
-	b, err := pool.Take(bCtx)
+	b, _, err := pool.Take(bCtx)
 	if err != nil {
 		t.Fatalf("error taking browser: %s\n", err)
 	}

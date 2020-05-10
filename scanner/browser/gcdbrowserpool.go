@@ -216,25 +216,25 @@ func (b *GCDBrowserPool) closeAndCreateBrowser(port string, doneCh chan struct{}
 }
 
 // Take a browser
-func (b *GCDBrowserPool) Take(ctx *browserk.Context) (browserk.Browser, error) {
+func (b *GCDBrowserPool) Take(ctx *browserk.Context) (browserk.Browser, string, error) {
 	var br *gcd.Gcd
 
 	if atomic.LoadInt32(&b.closing) == 1 {
-		return nil, ErrBrowserClosing
+		return nil, "", ErrBrowserClosing
 	}
 	// if nil, do not return browser
 	if br = b.Acquire(ctx.Ctx); br == nil {
-		return nil, errors.New("browser acquisition failed during Take")
+		return nil, "", errors.New("browser acquisition failed during Take")
 	}
 
 	log.Info().Int32("acquired", atomic.LoadInt32(&b.acquiredBrowsers)).Int32("errors", atomic.LoadInt32(&b.acquireErrors)).Msg("acquired browser")
 	t, err := br.GetFirstTab()
 	if err != nil {
 		b.Return(ctx.Ctx, br.Port())
-		return nil, fmt.Errorf("failed to aquire valid tab from browser")
+		return nil, "", fmt.Errorf("failed to aquire valid tab from browser")
 	}
 	gtab := NewTab(ctx, br, t)
-	return gtab, nil
+	return gtab, br.Port(), nil
 }
 
 // Return a browser for destruction

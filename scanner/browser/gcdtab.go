@@ -44,6 +44,7 @@ type Tab struct {
 	stableAfter           time.Duration          // amount of time of no activity to consider the DOM stable
 	lastNodeChangeTimeVal atomic.Value           // timestamp of when the last node change occurred atomic because multiple go routines will modify
 	domChangeHandler      DomChangeHandlerFunc   // allows the caller to be notified of DOM change events.
+	docWasUpdated         atomic.Value           // for tracking if an execution caused a new page load/transition
 }
 
 // NewTab to use
@@ -91,6 +92,45 @@ func (t *Tab) Close() {
 	close(t.exitCh)
 }
 
+// ExecuteAction for this browser, calling js handler after it is called
+func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, bool, error) {
+	causedLoad := false
+	// Call JSBefore hooks
+	t.ctx.NextJSBefore(t)
+
+	// reset doc was updated flag
+	t.docWasUpdated.Store(false)
+	// do action
+	switch act.Type {
+	case browserk.ActLoadURL:
+		t.Navigate(ctx, string(act.Input))
+	case browserk.ActExecuteJS:
+		t.InjectJS(string(act.Input))
+	case browserk.ActLeftClick:
+	case browserk.ActLeftClickDown:
+	case browserk.ActLeftClickUp:
+	case browserk.ActRightClick:
+	case browserk.ActRightClickDown:
+	case browserk.ActRightClickUp:
+	case browserk.ActMiddleClick:
+	case browserk.ActMiddleClickDown:
+	case browserk.ActMiddleClickUp:
+	case browserk.ActScroll:
+	case browserk.ActSendKeys:
+	case browserk.ActKeyUp:
+	case browserk.ActKeyDown:
+	case browserk.ActHover:
+	case browserk.ActFocus:
+	case browserk.ActWait:
+	}
+	// Call JSAfter hooks
+	t.ctx.NextJSAfter(t)
+	if docUpdated, ok := t.docWasUpdated.Load().(bool); ok {
+		causedLoad = docUpdated
+	}
+	return nil, causedLoad, nil
+}
+
 // Navigate to the url
 func (t *Tab) Navigate(ctx context.Context, url string) error {
 	if t.IsNavigating() {
@@ -132,45 +172,15 @@ func (t *Tab) ID() int64 {
 	return t.id
 }
 
+// Find an element by a browserk.Find type
 func (t *Tab) Find(ctx context.Context, finder browserk.Find) (*browserk.HTMLElement, error) {
 	return nil, nil
 }
 
+// GetMessages that occurred since last called
 func (t *Tab) GetMessages() ([]*browserk.HTTPMessage, error) {
 	msgs := t.container.GetMessages()
 	return msgs, nil
-}
-
-// ExecuteAction for this browser, calling js handler after it is called
-func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, error) {
-	// Call JSBefore hooks
-	t.ctx.NextJSBefore(t)
-	// do action
-	switch act.Type {
-	case browserk.ActLoadURL:
-		t.Navigate(ctx, string(act.Input))
-	case browserk.ActExecuteJS:
-		t.InjectJS(string(act.Input))
-	case browserk.ActLeftClick:
-	case browserk.ActLeftClickDown:
-	case browserk.ActLeftClickUp:
-	case browserk.ActRightClick:
-	case browserk.ActRightClickDown:
-	case browserk.ActRightClickUp:
-	case browserk.ActMiddleClick:
-	case browserk.ActMiddleClickDown:
-	case browserk.ActMiddleClickUp:
-	case browserk.ActScroll:
-	case browserk.ActSendKeys:
-	case browserk.ActKeyUp:
-	case browserk.ActKeyDown:
-	case browserk.ActHover:
-	case browserk.ActFocus:
-	case browserk.ActWait:
-	}
-	// Call JSAfter hooks
-	t.ctx.NextJSAfter(t)
-	return nil, nil
 }
 
 // InjectJS only caller knows what the response type will be so return an interface{}
@@ -342,6 +352,7 @@ func (t *Tab) DidNavigationFail() (bool, string) {
 	return false, ""
 }
 
+// GetCookies from the browser
 func (t *Tab) GetCookies() ([]*browserk.Cookie, error) {
 	cookies, err := t.t.Page.GetCookies()
 	if err != nil {
@@ -350,8 +361,14 @@ func (t *Tab) GetCookies() ([]*browserk.Cookie, error) {
 	return GCDCookieToBrowserk(cookies), nil
 }
 
+// GetStorageEvents and clear the container
 func (t *Tab) GetStorageEvents() []*browserk.StorageEvent {
 	return t.container.GetStorageEvents()
+}
+
+// GetConsoleEvents and clear the container
+func (t *Tab) GetConsoleEvents() []*browserk.ConsoleEvent {
+	return t.container.GetConsoleEvents()
 }
 
 // EvaluateScript in the global context.
@@ -652,7 +669,14 @@ func (t *Tab) GetElementsBySearch(selector string, includeUserAgentShadowDOM boo
 }
 
 func (t *Tab) GetDOM() (string, error) {
-	return t.GetPageSource(0)
+	node, err := t.t.DOM.GetDocument(-1, true)
+	if err != nil {
+		return "", err
+	}
+	html, err := t.t.DOM.GetOuterHTMLWithParams(&gcdapi.DOMGetOuterHTMLParams{
+		NodeId: node.NodeId,
+	})
+	return html, err
 }
 
 // GetPageSource returns the document's source, as visible, if docID is 0, returns top document source.
@@ -699,21 +723,6 @@ func (t *Tab) Screenshot(ctx context.Context) (string, error) {
 	return t.t.Page.CaptureScreenshotWithParams(params)
 }
 
-// SerializeDOM and return it as string
-func (t *Tab) SerializeDOM() string {
-	node, err := t.t.DOM.GetDocument(-1, true)
-	if err != nil {
-		return ""
-	}
-	html, err := t.t.DOM.GetOuterHTMLWithParams(&gcdapi.DOMGetOuterHTMLParams{
-		NodeId: node.NodeId,
-	})
-	if err != nil {
-		return ""
-	}
-	return html
-}
-
 // Sets the element as invalid and removes it from our elements map
 func (t *Tab) invalidateRemove(ele *Element) {
 	ele.setInvalidated(true)
@@ -725,6 +734,7 @@ func (t *Tab) invalidateRemove(ele *Element) {
 // the entire document has been invalidated, request all nodes again
 func (t *Tab) documentUpdated() {
 	log.Info().Msg("document has been invalidated")
+	t.docWasUpdated.Store(true)
 	t.getDocument()
 }
 
@@ -907,7 +917,7 @@ func (t *Tab) handleChildNodeInserted(parentNodeID int, node *gcdapi.DOMNode) {
 
 }
 
-// update ParentNodeId to remove child and iterate over Children recursively and invalidate them.
+// Update ParentNodeId to remove child and iterate over Children recursively and invalidate them.
 // TODO: come up with a better way of removing children without direct access to the node
 // as it's a potential race condition if it's being modified.
 func (t *Tab) handleChildNodeRemoved(parentNodeID, nodeID int) {

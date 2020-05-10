@@ -43,7 +43,7 @@ type Action struct {
 
 // BrowserPool handles taking/returning browsers
 type BrowserPool interface {
-	Take(ctx *Context) (Browser, error)
+	Take(ctx *Context) (Browser, string, error)
 	Return(ctx context.Context, browserPort string)
 	Leased() int
 	Shutdown() error
@@ -60,9 +60,10 @@ type Browser interface {
 	GetDOM() (string, error)
 	GetCookies() ([]*Cookie, error)
 	GetStorageEvents() []*StorageEvent
+	GetConsoleEvents() []*ConsoleEvent
 	Navigate(ctx context.Context, url string) (err error)
 	Find(ctx context.Context, finder Find) (*HTMLElement, error)
 	GetMessages() ([]*HTTPMessage, error)
 	Screenshot(ctx context.Context) (string, error)
-	ExecuteAction(ctx context.Context, act *Action) ([]byte, error)
+	ExecuteAction(ctx context.Context, act *Action) ([]byte, bool, error) // result, caused page load, err
 }

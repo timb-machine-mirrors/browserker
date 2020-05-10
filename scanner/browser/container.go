@@ -21,8 +21,13 @@ type Container struct {
 
 	storageLock   sync.RWMutex
 	storageEvents []*browserk.StorageEvent
+
+	consoleLock   sync.RWMutex
+	consoleEvents []*browserk.ConsoleEvent
 }
 
+// NewContainer for holding request/responses, storage and console events
+// Get*(s) methods will clear the underlying container type
 func NewContainer() *Container {
 	return &Container{
 		messages:      make(map[string]*browserk.HTTPMessage),
@@ -31,18 +36,37 @@ func NewContainer() *Container {
 	}
 }
 
+// AddStorageEvent to the container
 func (c *Container) AddStorageEvent(evt *browserk.StorageEvent) {
 	c.storageLock.Lock()
 	c.storageEvents = append(c.storageEvents, evt)
 	c.storageLock.Unlock()
 }
 
+// GetStorageEvents and clear the container
 func (c *Container) GetStorageEvents() []*browserk.StorageEvent {
 	c.storageLock.Lock()
 	evts := make([]*browserk.StorageEvent, len(c.storageEvents))
 	copy(evts, c.storageEvents)
 	c.storageEvents = make([]*browserk.StorageEvent, 0)
 	c.storageLock.Unlock()
+	return evts
+}
+
+// AddConsoleEvent to the container
+func (c *Container) AddConsoleEvent(evt *browserk.ConsoleEvent) {
+	c.consoleLock.Lock()
+	c.consoleEvents = append(c.consoleEvents, evt)
+	c.consoleLock.Unlock()
+}
+
+// GetConsoleEvents and clear the container
+func (c *Container) GetConsoleEvents() []*browserk.ConsoleEvent {
+	c.consoleLock.Lock()
+	evts := make([]*browserk.ConsoleEvent, len(c.consoleEvents))
+	copy(evts, c.consoleEvents)
+	c.consoleEvents = make([]*browserk.ConsoleEvent, 0)
+	c.consoleLock.Unlock()
 	return evts
 }
 

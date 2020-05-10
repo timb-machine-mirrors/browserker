@@ -21,6 +21,7 @@ type Browserk struct {
 	reporter     browserk.Reporter
 	browsers     browserk.BrowserPool
 	navEntryCh   chan [][]*browserk.Navigation
+	readyCh      chan struct{}
 	stateMonitor *time.Ticker
 	mainContext  *browserk.Context
 }
@@ -52,6 +53,7 @@ func (b *Browserk) Init(ctx context.Context) error {
 	}
 
 	b.navEntryCh = make(chan [][]*browserk.Navigation, b.cfg.NumBrowsers)
+	b.readyCh = make(chan struct{})
 
 	log.Logger.Info().Msg("initializing attack graph")
 	if err := b.attackGraph.Init(); err != nil {
@@ -119,6 +121,8 @@ func (b *Browserk) Start() error {
 		}
 		log.Info().Int("entries", len(entries)).Msg("Found entries")
 		b.navEntryCh <- entries
+		log.Info().Msg("Waiting for crawler to complete")
+		<-b.readyCh
 	}
 }
 
@@ -135,6 +139,8 @@ func (b *Browserk) processEntries() {
 			if err := b.crawl(entries); err != nil {
 				log.Error().Err(err).Msg("crawl entries failed")
 			}
+			log.Info().Msg("Crawler to complete")
+			b.readyCh <- struct{}{}
 		}
 	}
 }
@@ -143,13 +149,14 @@ func (b *Browserk) crawl(entries [][]*browserk.Navigation) error {
 	navCtx := b.mainContext.Copy()
 
 	for _, navs := range entries {
-		browser, err := b.browsers.Take(navCtx)
+		browser, port, err := b.browsers.Take(navCtx)
 		if err != nil {
 			return err
 		}
 
 		crawler := crawler.New(b.cfg)
 		if err := crawler.Init(); err != nil {
+			b.browsers.Return(navCtx.Ctx, port)
 			return err
 		}
 
@@ -164,6 +171,7 @@ func (b *Browserk) crawl(entries [][]*browserk.Navigation) error {
 			}
 			crawler.Process(navCtx, browser, nav, isFinal)
 		}
+		b.browsers.Return(navCtx.Ctx, port)
 	}
 	return nil
 }

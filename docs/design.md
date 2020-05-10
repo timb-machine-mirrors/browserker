@@ -30,6 +30,7 @@ Pretty much every data type should be stored in our custom DB built on badger
 - Crawl Graph
 - Attack Graph / Plugin Work Graph
 - Store req/resp in seperate badger nodes with requestID as key? keep graphs light?
+- Findings
 
 ## Plugins
 

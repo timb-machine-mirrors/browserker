@@ -14,7 +14,6 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.18.0
 	github.com/stretchr/testify v1.5.1 // indirect
-	github.com/urfave/cli v1.22.4
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/vmihailenco/msgpack/v4 v4.3.11
 	github.com/wirepair/gcd v1.0.9

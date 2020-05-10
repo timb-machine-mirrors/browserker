@@ -79,6 +79,7 @@ type NavigationResult struct {
 	Cookies       []*Cookie       `graph:"cookies"`
 	ConsoleEvents []*ConsoleEvent `graph:"console"`
 	StorageEvents []*StorageEvent `graph:"storage"`
+	CausedLoad    bool            `graph:"caused_load"`
 	WasError      bool            `graph:"was_error"`
 	Errors        []error         `graph:"errors"`
 }
