@@ -15,7 +15,7 @@ type ResponseHandler func(c *Context, browser Browser, i *InterceptedHTTPRespons
 type EventHandler func(c *Context)
 
 // JSHandler for adding middleware to exec JS before/after navigations
-type JSHandler func(c *Context)
+type JSHandler func(c *Context, browser Browser)
 
 const abortIndex int8 = math.MaxInt8 / 2
 
@@ -102,7 +102,6 @@ func (c *Context) NextResp(browser Browser, i *InterceptedHTTPResponse) {
 		c.respHandlers[c.respIndex](c, browser, i)
 		c.respIndex++
 	}
-
 }
 
 // AddRespHandler adds new request handlers
@@ -152,9 +151,9 @@ func (c *Context) EvtAbort() {
 }
 
 // NextJSBefore calls the next handler
-func (c *Context) NextJSBefore() {
+func (c *Context) NextJSBefore(browser Browser) {
 	for c.jsBeforeIndex < int8(len(c.jsBeforeHandler)) {
-		c.jsBeforeHandler[c.jsBeforeIndex](c)
+		c.jsBeforeHandler[c.jsBeforeIndex](c, browser)
 		c.jsBeforeIndex++
 	}
 }
@@ -179,9 +178,9 @@ func (c *Context) JSBeforeAbort() {
 }
 
 // NextJSAfter calls the next handler
-func (c *Context) NextJSAfter() {
+func (c *Context) NextJSAfter(browser Browser) {
 	for c.jsAfterIndex < int8(len(c.jsAfterHandler)) {
-		c.jsAfterHandler[c.jsAfterIndex](c)
+		c.jsAfterHandler[c.jsAfterIndex](c, browser)
 		c.jsBeforeIndex++
 	}
 }

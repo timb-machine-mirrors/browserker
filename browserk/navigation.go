@@ -69,13 +69,22 @@ func NewNavigation(triggeredBy TriggeredBy, action *Action) *Navigation {
 
 // NavigationResult captures result details about a navigation
 type NavigationResult struct {
-	ID           []byte        `graph:"res_id"`
-	NavigationID []byte        `graph:"nav_id"`
-	DOM          string        `graph:"dom"`
-	StartURL     string        `graph:"start_url"`
-	EndURL       string        `graph:"end_url"`
-	MessageCount int           `graph:"message_count"`
-	Messages     []HTTPMessage `graph:"messages"`
-	StorageEvts  []byte
-	CookieEvts   []byte
+	ID            []byte          `graph:"res_id"`
+	NavigationID  []byte          `graph:"nav_id"`
+	DOM           string          `graph:"dom"`
+	StartURL      string          `graph:"start_url"`
+	EndURL        string          `graph:"end_url"`
+	MessageCount  int             `graph:"message_count"`
+	Messages      []*HTTPMessage  `graph:"messages"`
+	Cookies       []*Cookie       `graph:"cookies"`
+	ConsoleEvents []*ConsoleEvent `graph:"console"`
+	StorageEvents []*StorageEvent `graph:"storage"`
+	WasError      bool            `graph:"was_error"`
+	Errors        []error         `graph:"errors"`
+}
+
+func (n *NavigationResult) AddError(err error) {
+	if err != nil {
+		n.Errors = append(n.Errors, err)
+	}
 }

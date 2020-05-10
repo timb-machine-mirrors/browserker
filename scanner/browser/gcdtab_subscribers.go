@@ -258,32 +258,59 @@ func (t *Tab) subscribeStorageEvents(storageFn StorageFunc) {
 		message := &gcdapi.DOMStorageDomStorageItemsClearedEvent{}
 		if err := json.Unmarshal(payload, message); err == nil {
 			p := message.Params
-			storageEvent := &StorageEvent{IsLocalStorage: p.StorageId.IsLocalStorage, SecurityOrigin: p.StorageId.SecurityOrigin}
-			storageFn(t, "cleared", storageEvent)
+			evt := &browserk.StorageEvent{
+				IsLocalStorage: p.StorageId.IsLocalStorage,
+				SecurityOrigin: p.StorageId.SecurityOrigin,
+				Observed:       time.Now(),
+				Type:           browserk.StorageClearedEvt,
+			}
+			t.container.AddStorageEvent(evt)
+
 		}
 	})
 	t.t.Subscribe("Storage.domStorageItemRemoved", func(target *gcd.ChromeTarget, payload []byte) {
 		message := &gcdapi.DOMStorageDomStorageItemRemovedEvent{}
 		if err := json.Unmarshal(payload, message); err == nil {
 			p := message.Params
-			storageEvent := &StorageEvent{IsLocalStorage: p.StorageId.IsLocalStorage, SecurityOrigin: p.StorageId.SecurityOrigin, Key: p.Key}
-			storageFn(t, "removed", storageEvent)
+			evt := &browserk.StorageEvent{
+				IsLocalStorage: p.StorageId.IsLocalStorage,
+				SecurityOrigin: p.StorageId.SecurityOrigin,
+				Key:            p.Key,
+				Observed:       time.Now(),
+				Type:           browserk.StorageRemovedEvt,
+			}
+			t.container.AddStorageEvent(evt)
 		}
 	})
 	t.t.Subscribe("Storage.domStorageItemAdded", func(target *gcd.ChromeTarget, payload []byte) {
 		message := &gcdapi.DOMStorageDomStorageItemAddedEvent{}
 		if err := json.Unmarshal(payload, message); err == nil {
 			p := message.Params
-			storageEvent := &StorageEvent{IsLocalStorage: p.StorageId.IsLocalStorage, SecurityOrigin: p.StorageId.SecurityOrigin, Key: p.Key, NewValue: p.NewValue}
-			storageFn(t, "added", storageEvent)
+			evt := &browserk.StorageEvent{
+				IsLocalStorage: p.StorageId.IsLocalStorage,
+				SecurityOrigin: p.StorageId.SecurityOrigin,
+				Key:            p.Key,
+				NewValue:       p.NewValue,
+				Observed:       time.Now(),
+				Type:           browserk.StorageAddedEvt,
+			}
+			t.container.AddStorageEvent(evt)
 		}
 	})
 	t.t.Subscribe("Storage.domStorageItemUpdated", func(target *gcd.ChromeTarget, payload []byte) {
 		message := &gcdapi.DOMStorageDomStorageItemUpdatedEvent{}
 		if err := json.Unmarshal(payload, message); err == nil {
 			p := message.Params
-			storageEvent := &StorageEvent{IsLocalStorage: p.StorageId.IsLocalStorage, SecurityOrigin: p.StorageId.SecurityOrigin, Key: p.Key, NewValue: p.NewValue, OldValue: p.OldValue}
-			storageFn(t, "updated", storageEvent)
+			evt := &browserk.StorageEvent{
+				IsLocalStorage: p.StorageId.IsLocalStorage,
+				SecurityOrigin: p.StorageId.SecurityOrigin,
+				Key:            p.Key,
+				NewValue:       p.NewValue,
+				OldValue:       p.OldValue,
+				Observed:       time.Now(),
+				Type:           browserk.StorageUpdatedEvt,
+			}
+			t.container.AddStorageEvent(evt)
 		}
 	})
 }

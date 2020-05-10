@@ -33,7 +33,7 @@ const (
 	ActSubRequest
 )
 
-// Action runs a browser action
+// Action runs a browser action, may or may not create a result
 type Action struct {
 	browser Browser
 	Type    ActionType `graph:"type"`
@@ -56,12 +56,13 @@ type BrowserOpts struct {
 // Browser interface
 type Browser interface {
 	ID() int64
-	// Navigate to a web page
+	GetURL() (string, error)
+	GetDOM() (string, error)
+	GetCookies() ([]*Cookie, error)
+	GetStorageEvents() []*StorageEvent
 	Navigate(ctx context.Context, url string) (err error)
 	Find(ctx context.Context, finder Find) (*HTMLElement, error)
-	Instrument(opt *BrowserOpts) error
 	GetMessages() ([]*HTTPMessage, error)
 	Screenshot(ctx context.Context) (string, error)
-	Execute(ctx context.Context, act map[int]*Action) error
-	ExecuteSingle(ctx context.Context, act *Action) error
+	ExecuteAction(ctx context.Context, act *Action) ([]byte, error)
 }

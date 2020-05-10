@@ -1,16 +1,8 @@
 package browserk
 
-import "github.com/wirepair/gcd/gcdapi"
-
-// revive:disable:var-naming
-
-// HTTPMessage is the request/response pair
-type HTTPMessage struct {
-	Request     *HTTPRequest
-	RequestMod  *HTTPModifiedRequest
-	Response    *HTTPResponse
-	ResponseMod *HTTPModifiedResponse
-}
+import (
+	"github.com/wirepair/gcd/gcdapi"
+)
 
 // HTTPRequest contains all information regarding a network request
 type HTTPRequest struct {

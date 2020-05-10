@@ -136,21 +136,41 @@ func (t *Tab) Find(ctx context.Context, finder browserk.Find) (*browserk.HTMLEle
 	return nil, nil
 }
 
-func (t *Tab) Instrument(opt *browserk.BrowserOpts) error {
-	return nil
-}
-
 func (t *Tab) GetMessages() ([]*browserk.HTTPMessage, error) {
 	msgs := t.container.GetMessages()
 	return msgs, nil
 }
 
-func (t *Tab) Execute(ctx context.Context, act map[int]*browserk.Action) error {
-	return nil
-}
-
-func (t *Tab) ExecuteSingle(ctx context.Context, act *browserk.Action) error {
-	return nil
+// ExecuteAction for this browser, calling js handler after it is called
+func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, error) {
+	// Call JSBefore hooks
+	t.ctx.NextJSBefore(t)
+	// do action
+	switch act.Type {
+	case browserk.ActLoadURL:
+		t.Navigate(ctx, string(act.Input))
+	case browserk.ActExecuteJS:
+		t.InjectJS(string(act.Input))
+	case browserk.ActLeftClick:
+	case browserk.ActLeftClickDown:
+	case browserk.ActLeftClickUp:
+	case browserk.ActRightClick:
+	case browserk.ActRightClickDown:
+	case browserk.ActRightClickUp:
+	case browserk.ActMiddleClick:
+	case browserk.ActMiddleClickDown:
+	case browserk.ActMiddleClickUp:
+	case browserk.ActScroll:
+	case browserk.ActSendKeys:
+	case browserk.ActKeyUp:
+	case browserk.ActKeyDown:
+	case browserk.ActHover:
+	case browserk.ActFocus:
+	case browserk.ActWait:
+	}
+	// Call JSAfter hooks
+	t.ctx.NextJSAfter(t)
+	return nil, nil
 }
 
 // InjectJS only caller knows what the response type will be so return an interface{}
@@ -179,8 +199,8 @@ func (t *Tab) InjectJS(inject string) (interface{}, error) {
 	return r.Value, nil
 }
 
-// GetURL by looking at the navigation history
-func (t *Tab) GetURL(ctx context.Context) string {
+// GetNavURL by looking at the navigation history
+func (t *Tab) GetNavURL() string {
 	_, entries, err := t.t.Page.GetNavigationHistory()
 	if err != nil || len(entries) == 0 {
 		return ""
@@ -320,6 +340,18 @@ func (t *Tab) DidNavigationFail() (bool, string) {
 	}
 
 	return false, ""
+}
+
+func (t *Tab) GetCookies() ([]*browserk.Cookie, error) {
+	cookies, err := t.t.Page.GetCookies()
+	if err != nil {
+		return nil, err
+	}
+	return GCDCookieToBrowserk(cookies), nil
+}
+
+func (t *Tab) GetStorageEvents() []*browserk.StorageEvent {
+	return t.container.GetStorageEvents()
 }
 
 // EvaluateScript in the global context.
@@ -619,6 +651,10 @@ func (t *Tab) GetElementsBySearch(selector string, includeUserAgentShadowDOM boo
 	return elements, nil
 }
 
+func (t *Tab) GetDOM() (string, error) {
+	return t.GetPageSource(0)
+}
+
 // GetPageSource returns the document's source, as visible, if docID is 0, returns top document source.
 func (t *Tab) GetPageSource(docNodeID int) (string, error) {
 	if docNodeID == 0 {
@@ -632,8 +668,8 @@ func (t *Tab) GetPageSource(docNodeID int) (string, error) {
 	return t.t.DOM.GetOuterHTMLWithParams(outerParams)
 }
 
-// GetCurrentURL returns the current url of the top level document
-func (t *Tab) GetCurrentURL() (string, error) {
+// GetURL returns the current url of the top level document
+func (t *Tab) GetURL() (string, error) {
 	return t.GetDocumentCurrentURL(t.getTopNodeID())
 }
 

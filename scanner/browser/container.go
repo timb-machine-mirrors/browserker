@@ -18,13 +18,32 @@ type Container struct {
 	respReady     map[string]chan struct{}
 
 	requestCount int32
+
+	storageLock   sync.RWMutex
+	storageEvents []*browserk.StorageEvent
 }
 
 func NewContainer() *Container {
 	return &Container{
-		messages:  make(map[string]*browserk.HTTPMessage),
-		respReady: make(map[string]chan struct{}),
+		messages:      make(map[string]*browserk.HTTPMessage),
+		respReady:     make(map[string]chan struct{}),
+		storageEvents: make([]*browserk.StorageEvent, 0),
 	}
+}
+
+func (c *Container) AddStorageEvent(evt *browserk.StorageEvent) {
+	c.storageLock.Lock()
+	c.storageEvents = append(c.storageEvents, evt)
+	c.storageLock.Unlock()
+}
+
+func (c *Container) GetStorageEvents() []*browserk.StorageEvent {
+	c.storageLock.Lock()
+	evts := make([]*browserk.StorageEvent, len(c.storageEvents))
+	copy(evts, c.storageEvents)
+	c.storageEvents = make([]*browserk.StorageEvent, 0)
+	c.storageLock.Unlock()
+	return evts
 }
 
 // SetLoadRequest uses the requestID of the *first* request as
