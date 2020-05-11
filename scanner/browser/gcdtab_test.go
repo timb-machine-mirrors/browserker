@@ -83,6 +83,30 @@ func TestHookRequests(t *testing.T) {
 	spew.Dump(msgs)
 }
 
+func TestGetElements(t *testing.T) {
+	pool := browser.NewGCDBrowserPool(1, leaser)
+	if err := pool.Init(); err != nil {
+		t.Fatalf("failed to init pool")
+	}
+	defer leaser.Cleanup()
+
+	ctx := context.Background()
+	bCtx := mock.Context(ctx)
+
+	b, _, err := pool.Take(bCtx)
+	if err != nil {
+		t.Fatalf("error taking browser: %s\n", err)
+	}
+
+	b.Navigate(ctx, "https://about.gitlab.com")
+
+	ele, err := b.FindElements("a")
+	if err != nil {
+		t.Fatalf("error getting elements: %s\n", err)
+	}
+	spew.Dump(ele)
+}
+
 func TestGcdWindows(t *testing.T) {
 	pool := browser.NewGCDBrowserPool(1, leaser)
 	if err := pool.Init(); err != nil {

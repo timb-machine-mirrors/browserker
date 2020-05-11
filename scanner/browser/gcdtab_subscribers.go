@@ -194,36 +194,35 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 	})
 
 	t.t.Subscribe("Network.requestWillBeSent", func(target *gcd.ChromeTarget, payload []byte) {
+		t.container.IncRequest()
 		message := &gcdapi.NetworkRequestWillBeSentEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {
 			return
 		}
 		log.Info().Str("request_id", message.Params.RequestId).Msg("adding request")
 		req := GCDRequestToBrowserk(message)
-		t.container.IncRequest()
 
 		if message.Params.Type == "Document" {
 			log.Info().Str("request_id", message.Params.RequestId).Msg("is Document request")
 			t.container.SetLoadRequest(req)
 		}
 		t.container.AddRequest(req)
-		log.Info().Str("request_id", message.Params.RequestId).Msg("added request")
+		log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("added request")
 	})
 
 	t.t.Subscribe("Network.responseReceived", func(target *gcd.ChromeTarget, payload []byte) {
-		defer t.container.DecRequest()
+		t.container.DecRequest()
 
 		message := &gcdapi.NetworkResponseReceivedEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {
 			return
 		}
 		p := message.Params
-		log.Info().Str("request_id", message.Params.RequestId).Msg("waiting")
+		log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("waiting")
 
 		timeoutCtx, cancel := context.WithTimeout(ctx.Ctx, time.Second*60)
 		defer cancel()
 
-		// log.Info().Str("request_id", p.RequestId).Msg("waiting")
 		if err := t.container.WaitFor(timeoutCtx, p.RequestId); err != nil {
 			return
 		}
@@ -238,7 +237,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		}
 		log.Info().Msg("adding response w/body to container")
 		t.container.AddResponse(GCDResponseToBrowserk(message, body))
-		log.Info().Msg("added")
+		log.Info().Int32("pending", t.container.OpenRequestCount()).Msg("added")
 
 	})
 
@@ -248,6 +247,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		if err := json.Unmarshal(payload, message); err != nil {
 			return
 		}
+		log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("finished")
 		//log.Ctx(ctx).Info().Str("request_ID", message.Params.RequestID).Msg("finished")
 		t.container.BodyReady(message.Params.RequestId)
 	})
@@ -334,8 +334,11 @@ func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 			bodyStr, encoded, err := t.t.Fetch.GetResponseBody(p.RequestId)
 			if err != nil {
 				log.Warn().Err(err).Msg("unable to get body")
-				respParams.Body = base64.StdEncoding.EncodeToString([]byte(""))
-				t.t.Fetch.FulfillRequestWithParams(respParams)
+				t.t.Fetch.ContinueRequestWithParams(&gcdapi.FetchContinueRequestParams{
+					RequestId: p.RequestId,
+				})
+				//respParams.Body = base64.StdEncoding.EncodeToString([]byte(""))
+				//t.t.Fetch.FulfillRequestWithParams(respParams)
 				return
 			}
 

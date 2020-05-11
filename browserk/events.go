@@ -6,13 +6,17 @@ import "time"
 type StorageEventType int8
 
 const (
+	// StorageClearedEvt cleared the storage type
 	StorageClearedEvt StorageEventType = iota
+	// StorageRemovedEvt removed an element
 	StorageRemovedEvt
+	// StorageAddedEvt added an element
 	StorageAddedEvt
+	// StorageUpdatedEvt updated an element
 	StorageUpdatedEvt
 )
 
-// StorageEvent details
+// StorageEvent captures local/sessionStorage details
 type StorageEvent struct {
 	Type           StorageEventType `json:"type"`      // Type of storage event
 	IsLocalStorage bool             `json:"is_local"`  // if true, local storage, false session storage
@@ -23,11 +27,12 @@ type StorageEvent struct {
 	Observed       time.Time        `json:"observed"`  // time the storage event occurred
 }
 
+// ConsoleEvent captures console.log events
 type ConsoleEvent struct {
 	Source   string    `json:"source"`           // Message source.
 	Level    string    `json:"level"`            // Message severity.
 	Text     string    `json:"text"`             // Message text.
-	Url      string    `json:"url,omitempty"`    // URL of the message origin.
+	URL      string    `json:"url,omitempty"`    // URL of the message origin.
 	Line     int       `json:"line,omitempty"`   // Line number in the resource that generated this message (1-based).
 	Column   int       `json:"column,omitempty"` // Column number in the resource that generated this message (1-based).
 	Observed time.Time `json:"observed"`         // time the console event occurred

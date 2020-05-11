@@ -62,7 +62,7 @@ type Browser interface {
 	GetStorageEvents() []*StorageEvent
 	GetConsoleEvents() []*ConsoleEvent
 	Navigate(ctx context.Context, url string) (err error)
-	Find(ctx context.Context, finder Find) ([]*HTMLElement, error)
+	FindElements(querySelector string) ([]*HTMLElement, error)
 	GetMessages() ([]*HTTPMessage, error)
 	Screenshot(ctx context.Context) (string, error)
 	ExecuteAction(ctx context.Context, act *Action) ([]byte, bool, error) // result, caused page load, err

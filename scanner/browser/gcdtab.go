@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
@@ -172,9 +174,42 @@ func (t *Tab) ID() int64 {
 	return t.id
 }
 
-// Find an element by a browserk.Find type
-func (t *Tab) Find(ctx context.Context, finder browserk.Find) ([]*browserk.HTMLElement, error) {
-	return nil, nil
+// FindElements elements via querySelector
+func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error) {
+	t.handleDocumentUpdated() // refresh Document
+	elements, err := t.GetElementsBySelector(querySelector)
+	if err != nil {
+		return nil, err
+	}
+	bElements := make([]*browserk.HTMLElement, 0)
+	for _, ele := range elements {
+		var ok bool
+
+		b := &browserk.HTMLElement{Events: make([]browserk.HTMLEventType, 0)}
+		b.Type = browserk.CUSTOM
+
+		tag, _ := ele.GetTagName()
+		b.Attributes, _ = ele.GetAttributes()
+		listeners, err := ele.GetEventListeners()
+		if err == nil {
+			for _, listener := range listeners {
+				eventType, ok := browserk.HTMLEventTypeMap[listener.Type]
+				if !ok {
+					eventType = browserk.HTMLEventcustom
+				}
+				b.Events = append(b.Events, eventType)
+			}
+		}
+		b.Location = ""
+
+		b.Type, ok = browserk.HTMLTypeMap[strings.ToUpper(tag)]
+		if !ok {
+			b.CustomTagName = tag
+		}
+		bElements = append(bElements, b)
+	}
+	spew.Dump(bElements)
+	return bElements, nil
 }
 
 // GetMessages that occurred since last called
@@ -281,7 +316,7 @@ func (t *Tab) SetStabilityTimeout(timeout time.Duration) {
 	t.stabilityTimeout = timeout
 }
 
-// SetStabilityTime to wait for no node changes before we consIDer the DOM stable.
+// SetStabilityTime to wait for no node changes before we consider the DOM stable.
 // Note that stability timeout will fire if the DOM is constantly changing.
 // The deafult stableAfter is 300 ms.
 func (t *Tab) SetStabilityTime(stableAfter time.Duration) {
@@ -486,6 +521,7 @@ func (t *Tab) getDocument() (*Element, error) {
 	if err != nil {
 		return nil, err
 	}
+	log.Info().Msg("getDocument called")
 
 	t.setTopNodeID(doc.NodeId)
 	t.setTopFrameID(doc.FrameId)
@@ -622,8 +658,15 @@ func (t *Tab) GetDocumentElementsBySelector(docNodeID int, selector string) ([]*
 	if !ok {
 		return nil, &ElementNotFoundErr{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
 	}
+	log.Info().Msgf("GOT DOCNODE")
+	spew.Dump(docNode)
 	nodeIDs, errQuery := t.t.DOM.QuerySelectorAll(docNode.ID, selector)
 	if errQuery != nil {
+		log.Info().Msgf("QuerySelectorAll Err: %#v", errQuery)
+		doc, err := t.t.DOM.GetDocument(1, false)
+		if err == nil {
+			spew.Dump(doc)
+		}
 		return nil, errQuery
 	}
 
@@ -668,6 +711,7 @@ func (t *Tab) GetElementsBySearch(selector string, includeUserAgentShadowDOM boo
 	return elements, nil
 }
 
+// GetDOM in serialized form
 func (t *Tab) GetDOM() (string, error) {
 	node, err := t.t.DOM.GetDocument(-1, true)
 	if err != nil {
