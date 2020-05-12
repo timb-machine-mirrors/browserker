@@ -5,7 +5,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
 )
 
@@ -125,11 +124,12 @@ func (c *Container) GetMessages() []*browserk.HTTPMessage {
 		i++
 	}
 	c.messages = make(map[string]*browserk.HTTPMessage, 0)
+	atomic.StoreInt32(&c.requestCount, 0)
 	c.loadRequestID = ""
 	return msgs
 }
 
-// AddRequest to our map of messages
+// AddRequest to our map of messages // TODO: handle redirects better
 func (c *Container) AddRequest(request *browserk.HTTPRequest) {
 	var exist bool
 	msg := &browserk.HTTPMessage{}
@@ -138,6 +138,7 @@ func (c *Container) AddRequest(request *browserk.HTTPRequest) {
 	if msg, exist = c.messages[request.RequestId]; !exist {
 		msg = &browserk.HTTPMessage{}
 	}
+
 	msg.Request = request
 	c.messages[request.RequestId] = msg
 	c.messageLock.Unlock()
@@ -147,7 +148,6 @@ func (c *Container) AddRequest(request *browserk.HTTPRequest) {
 func (c *Container) AddResponse(response *browserk.HTTPResponse) {
 	var exist bool
 	msg := &browserk.HTTPMessage{}
-	log.Info().Str("request_id", response.RequestId).Msg("adding response")
 	c.messageLock.Lock()
 	if msg, exist = c.messages[response.RequestId]; !exist {
 		msg = &browserk.HTTPMessage{}

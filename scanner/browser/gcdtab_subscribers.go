@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
@@ -53,7 +55,6 @@ func (t *Tab) subscribeLoadEvent() {
 
 func (t *Tab) subscribeFrameLoadingEvent() {
 	t.t.Subscribe("Page.frameStartedLoading", func(target *gcd.ChromeTarget, payload []byte) {
-		log.Debug().Msgf("frameStartedLoading: %s\n", string(payload))
 		if t.IsNavigating() {
 			return
 		}
@@ -68,7 +69,6 @@ func (t *Tab) subscribeFrameLoadingEvent() {
 
 func (t *Tab) subscribeFrameFinishedEvent() {
 	t.t.Subscribe("Page.frameStoppedLoading", func(target *gcd.ChromeTarget, payload []byte) {
-		log.Debug().Msgf("frameStoppedLoading: %s\n", string(payload))
 		if t.IsNavigating() {
 			return
 		}
@@ -187,72 +187,6 @@ func (t *Tab) subscribeDocumentUpdated() {
 	})
 }
 
-func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
-	t.t.Subscribe("network.loadingFailed", func(target *gcd.ChromeTarget, payload []byte) {
-		log.Info().Msgf("failed: %s\n", string(payload))
-		t.container.DecRequest()
-	})
-
-	t.t.Subscribe("Network.requestWillBeSent", func(target *gcd.ChromeTarget, payload []byte) {
-		t.container.IncRequest()
-		message := &gcdapi.NetworkRequestWillBeSentEvent{}
-		if err := json.Unmarshal(payload, message); err != nil {
-			return
-		}
-		log.Info().Str("request_id", message.Params.RequestId).Msg("adding request")
-		req := GCDRequestToBrowserk(message)
-
-		if message.Params.Type == "Document" {
-			log.Info().Str("request_id", message.Params.RequestId).Msg("is Document request")
-			t.container.SetLoadRequest(req)
-		}
-		t.container.AddRequest(req)
-		log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("added request")
-	})
-
-	t.t.Subscribe("Network.responseReceived", func(target *gcd.ChromeTarget, payload []byte) {
-		t.container.DecRequest()
-
-		message := &gcdapi.NetworkResponseReceivedEvent{}
-		if err := json.Unmarshal(payload, message); err != nil {
-			return
-		}
-		p := message.Params
-		log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("waiting")
-
-		timeoutCtx, cancel := context.WithTimeout(ctx.Ctx, time.Second*60)
-		defer cancel()
-
-		if err := t.container.WaitFor(timeoutCtx, p.RequestId); err != nil {
-			return
-		}
-		bodyStr, encoded, err := t.t.Network.GetResponseBody(message.Params.RequestId)
-		if err != nil {
-			log.Warn().Str("url", message.Params.Response.Url).Err(err).Msg("failed to get body")
-		}
-
-		body := []byte(bodyStr)
-		if encoded {
-			body, _ = base64.StdEncoding.DecodeString(bodyStr)
-		}
-		log.Info().Msg("adding response w/body to container")
-		t.container.AddResponse(GCDResponseToBrowserk(message, body))
-		log.Info().Int32("pending", t.container.OpenRequestCount()).Msg("added")
-
-	})
-
-	t.t.Subscribe("Network.loadingFinished", func(target *gcd.ChromeTarget, payload []byte) {
-		//log.Info().Msgf("loadingFinished DATA: %#v\n", string(payload))
-		message := &gcdapi.NetworkLoadingFinishedEvent{}
-		if err := json.Unmarshal(payload, message); err != nil {
-			return
-		}
-		log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("finished")
-		//log.Ctx(ctx).Info().Str("request_ID", message.Params.RequestID).Msg("finished")
-		t.container.BodyReady(message.Params.RequestId)
-	})
-}
-
 func (t *Tab) subscribeStorageEvents(storageFn StorageFunc) {
 	t.t.Subscribe("Storage.domStorageItemsCleared", func(target *gcd.ChromeTarget, payload []byte) {
 		message := &gcdapi.DOMStorageDomStorageItemsClearedEvent{}
@@ -315,83 +249,185 @@ func (t *Tab) subscribeStorageEvents(storageFn StorageFunc) {
 	})
 }
 
+// TODO: Need to account for redirects since they use the same requestIDs and don't seem to allow retrieving their bodies
+// HOWEVER it does appear we can intercept them???
+func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
+	t.t.Subscribe("network.loadingFailed", func(target *gcd.ChromeTarget, payload []byte) {
+		log.Info().Msgf("failed: %s\n", string(payload))
+		t.container.DecRequest()
+	})
+
+	t.t.Subscribe("Network.requestWillBeSent", func(target *gcd.ChromeTarget, payload []byte) {
+		t.container.IncRequest()
+		message := &gcdapi.NetworkRequestWillBeSentEvent{}
+		if err := json.Unmarshal(payload, message); err != nil {
+			return
+		}
+		req := GCDRequestToBrowserk(message)
+
+		if message.Params.Type == "Document" {
+			//log.Info().Str("request_id", message.Params.RequestId).Msg("is Document request")
+			t.container.SetLoadRequest(req)
+		}
+		if message.Params.RedirectResponse != nil {
+			t.container.DecRequest() // need to account for redirects
+			body := []byte("")
+			fake := RedirectResponseToNetworkResponse(message)
+			t.container.AddResponse(GCDResponseToBrowserk(fake, body))
+		}
+		t.container.AddRequest(req)
+		log.Debug().Int32("pending", t.container.OpenRequestCount()).Str("url", message.Params.Request.Url).Str("request_id", message.Params.RequestId).Msg("added request")
+	})
+
+	t.t.Subscribe("Network.requestServedFromCache", func(target *gcd.ChromeTarget, payload []byte) {
+		message := &gcdapi.NetworkRequestServedFromCacheEvent{}
+		if err := json.Unmarshal(payload, message); err != nil {
+			return
+		}
+		//log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("served from cache")
+	})
+
+	t.t.Subscribe("Network.responseReceived", func(target *gcd.ChromeTarget, payload []byte) {
+		t.container.DecRequest()
+		message := &gcdapi.NetworkResponseReceivedEvent{}
+		if err := json.Unmarshal(payload, message); err != nil {
+			return
+		}
+		p := message.Params
+		//log.Info().Int32("pending", t.container.OpenRequestCount()).Str("url", p.Response.Url).Str("request_id", message.Params.RequestId).Msg("waiting")
+
+		timeoutCtx, cancel := context.WithTimeout(ctx.Ctx, time.Second*60)
+		defer cancel()
+
+		if err := t.container.WaitFor(timeoutCtx, p.RequestId); err != nil {
+			return
+		}
+		bodyStr, encoded, err := t.t.Network.GetResponseBody(message.Params.RequestId)
+		if err != nil {
+			log.Warn().Str("url", message.Params.Response.Url).Err(err).Msg("failed to get body")
+		}
+
+		body := []byte(bodyStr)
+		if encoded {
+			body, _ = base64.StdEncoding.DecodeString(bodyStr)
+		}
+
+		t.container.AddResponse(GCDResponseToBrowserk(message, body))
+		log.Debug().Int32("pending", t.container.OpenRequestCount()).Str("url", p.Response.Url).Str("request_id", message.Params.RequestId).Msg("added")
+	})
+
+	t.t.Subscribe("Network.loadingFinished", func(target *gcd.ChromeTarget, payload []byte) {
+		message := &gcdapi.NetworkLoadingFinishedEvent{}
+		if err := json.Unmarshal(payload, message); err != nil {
+			return
+		}
+		//log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("finished")
+		t.container.BodyReady(message.Params.RequestId)
+	})
+}
+
 func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 	t.t.Subscribe("Fetch.requestPaused", func(target *gcd.ChromeTarget, payload []byte) {
-
 		message := &gcdapi.FetchRequestPausedEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {
 			log.Fatal().Err(err).Msg("critical error Fetch.requestPaused event was unable to decode")
 		}
 
-		p := message.Params
 		// we are in a response paused event
-		if p.ResponseHeaders != nil {
-			log.Info().Msg("Fetch.requestPaused Response Event")
-			respParams := &gcdapi.FetchFulfillRequestParams{
-				RequestId:    p.RequestId,
-				ResponseCode: p.ResponseStatusCode,
-			}
-			bodyStr, encoded, err := t.t.Fetch.GetResponseBody(p.RequestId)
-			if err != nil {
-				log.Warn().Err(err).Msg("unable to get body")
-				t.t.Fetch.ContinueRequestWithParams(&gcdapi.FetchContinueRequestParams{
-					RequestId: p.RequestId,
-				})
-				//respParams.Body = base64.StdEncoding.EncodeToString([]byte(""))
-				//t.t.Fetch.FulfillRequestWithParams(respParams)
-				return
-			}
-
-			modified := GCDFetchResponseToIntercepted(message, bodyStr, encoded)
-
-			ctx.NextResp(t, modified)
-
-			if modified.Modified.ResponseCode != 0 {
-				respParams.ResponseCode = modified.Modified.ResponseCode
-			}
-
-			if modified.Modified.Body != nil {
-				respParams.Body = base64.StdEncoding.EncodeToString(modified.Modified.Body)
-			} else {
-				if encoded {
-					respParams.Body = bodyStr
-				} else {
-					respParams.Body = base64.StdEncoding.EncodeToString([]byte(bodyStr))
-				}
-			}
-
-			if modified.Modified.ResponseHeaders != nil {
-				respParams.ResponseHeaders = modified.Modified.ResponseHeaders
-			}
-			if modified.Modified.ResponsePhrase != "" {
-				respParams.ResponsePhrase = modified.Modified.ResponsePhrase
-			}
-			t.t.Fetch.FulfillRequestWithParams(respParams)
+		if message.Params.ResponseHeaders != nil {
+			t.interceptedResponse(ctx, message)
 		} else {
-			log.Info().Msg("Fetch.requestPaused Request Event")
-			// we are in a request paused event
-			modified := GCDFetchRequestToIntercepted(message, t.container)
-			log.Info().Msg("Calling request Hooks")
-			ctx.NextReq(t, modified)
-
-			reqParams := &gcdapi.FetchContinueRequestParams{
-				RequestId: modified.RequestId,
-			}
-
-			if modified.Modified.Method != "" {
-				reqParams.Method = modified.Modified.Method
-			}
-			if modified.Modified.Url != "" {
-				reqParams.Url = modified.Modified.Url
-			}
-			if modified.Modified.Headers != nil {
-				reqParams.Headers = modified.Modified.Headers
-			}
-			if modified.Modified.PostData != "" {
-				reqParams.PostData = modified.Modified.PostData
-			}
-			t.t.Fetch.ContinueRequestWithParams(reqParams)
+			t.interceptedRequest(ctx, message)
 		}
-
 	})
+}
+
+func (t *Tab) interceptedRequest(ctx *browserk.Context, message *gcdapi.FetchRequestPausedEvent) {
+	//log.Info().Msg("Fetch.requestPaused Request Event")
+	// we are in a request paused event
+	modified := GCDFetchRequestToIntercepted(message, t.container)
+	//log.Info().Msg("Calling request Hooks")
+	ctx.NextReq(t, modified)
+
+	reqParams := &gcdapi.FetchContinueRequestParams{
+		RequestId: modified.RequestId,
+	}
+
+	if modified.Modified.Method != "" {
+		reqParams.Method = modified.Modified.Method
+	}
+	if modified.Modified.Url != "" {
+		reqParams.Url = modified.Modified.Url
+	}
+	if modified.Modified.Headers != nil {
+		reqParams.Headers = modified.Modified.Headers
+	}
+	if modified.Modified.PostData != "" {
+		reqParams.PostData = modified.Modified.PostData
+	}
+	t.t.Fetch.ContinueRequestWithParams(reqParams)
+}
+
+func (t *Tab) interceptedResponse(ctx *browserk.Context, message *gcdapi.FetchRequestPausedEvent) {
+	p := message.Params
+
+	//log.Info().Msg("Fetch.requestPaused Response Event")
+	respParams := &gcdapi.FetchFulfillRequestParams{
+		RequestId:    p.RequestId,
+		ResponseCode: p.ResponseStatusCode,
+	}
+
+	if !hasBody(p.ResponseHeaders) {
+		spew.Dump(p)
+		respParams.ResponseHeaders = p.ResponseHeaders
+		t.t.Fetch.FulfillRequestWithParams(respParams)
+		return
+	}
+
+	bodyStr, encoded, err := t.t.Fetch.GetResponseBody(p.RequestId)
+	if err != nil {
+		log.Warn().Err(err).Msg("unable to get body")
+		spew.Dump(p)
+		t.t.Fetch.ContinueRequestWithParams(&gcdapi.FetchContinueRequestParams{
+			RequestId: p.RequestId,
+		})
+		//respParams.Body = base64.StdEncoding.EncodeToString([]byte(""))
+		//t.t.Fetch.FulfillRequestWithParams(respParams)
+		return
+	}
+
+	modified := GCDFetchResponseToIntercepted(message, bodyStr, encoded)
+
+	ctx.NextResp(t, modified)
+
+	if modified.Modified.ResponseCode != 0 {
+		respParams.ResponseCode = modified.Modified.ResponseCode
+	}
+
+	if modified.Modified.Body != nil {
+		respParams.Body = base64.StdEncoding.EncodeToString(modified.Modified.Body)
+	} else {
+		if encoded {
+			respParams.Body = bodyStr
+		} else {
+			respParams.Body = base64.StdEncoding.EncodeToString([]byte(bodyStr))
+		}
+	}
+
+	if modified.Modified.ResponseHeaders != nil {
+		respParams.ResponseHeaders = modified.Modified.ResponseHeaders
+	}
+	if modified.Modified.ResponsePhrase != "" {
+		respParams.ResponsePhrase = modified.Modified.ResponsePhrase
+	}
+	t.t.Fetch.FulfillRequestWithParams(respParams)
+}
+
+func hasBody(headers []*gcdapi.FetchHeaderEntry) bool {
+	for _, header := range headers {
+		if strings.ToLower(header.Name) == "content-length" && header.Value == "0" {
+			return false
+		}
+	}
+	return true
 }

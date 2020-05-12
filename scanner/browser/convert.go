@@ -133,3 +133,25 @@ func GCDCookieToBrowserk(gcdCookie []*gcdapi.NetworkCookie) []*browserk.Cookie {
 	}
 	return cookies
 }
+
+func RedirectResponseToNetworkResponse(req *gcdapi.NetworkRequestWillBeSentEvent) *gcdapi.NetworkResponseReceivedEvent {
+	p := req.Params
+	return &gcdapi.NetworkResponseReceivedEvent{
+		Method: "",
+		Params: struct {
+			RequestId string                  "json:\"requestId\""
+			LoaderId  string                  "json:\"loaderId\""
+			Timestamp float64                 "json:\"timestamp\""
+			Type      string                  "json:\"type\""
+			Response  *gcdapi.NetworkResponse "json:\"response\""
+			FrameId   string                  "json:\"frameId,omitempty\""
+		}{
+			RequestId: p.RequestId,
+			LoaderId:  p.LoaderId,
+			Timestamp: p.RedirectResponse.Timing.ReceiveHeadersEnd,
+			Type:      p.Type,
+			Response:  p.RedirectResponse,
+			FrameId:   p.FrameId,
+		},
+	}
+}

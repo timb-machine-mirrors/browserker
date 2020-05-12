@@ -98,13 +98,25 @@ func TestGetElements(t *testing.T) {
 		t.Fatalf("error taking browser: %s\n", err)
 	}
 
-	b.Navigate(ctx, "https://about.gitlab.com")
+	b.Navigate(ctx, "https://gitlab.com")
 
-	ele, err := b.FindElements("a")
+	/*
+		ele, err := b.FindElements("a")
+		if err != nil {
+			t.Fatalf("error getting elements: %s\n", err)
+		}
+	*/
+	msgs, err := b.GetMessages()
 	if err != nil {
-		t.Fatalf("error getting elements: %s\n", err)
+		t.Fatalf("error getting messages: %s\n", err)
 	}
-	spew.Dump(ele)
+	for _, msg := range msgs {
+		if msg.Response == nil {
+			t.Logf("ID: %s !!!!!!!!!!!!! %s never completed\n", msg.Request.RequestId, msg.Request.Request.Url)
+		} else {
+			t.Logf("ID: %s URL: %s (resp) %s\n", msg.Request.RequestId, msg.Request.Request.Url, msg.Response.Type)
+		}
+	}
 }
 
 func TestGcdWindows(t *testing.T) {

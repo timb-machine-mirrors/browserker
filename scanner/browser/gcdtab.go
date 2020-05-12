@@ -273,7 +273,7 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 	case <-t.navigationCh:
 	}
 
-	stableTimer := time.After(5 * time.Second)
+	stableTimer := time.After(15 * time.Second)
 
 	// wait for DOM & network stability
 	log.Info().Msg("waiting for nav stability complete")
