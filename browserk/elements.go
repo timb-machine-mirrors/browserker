@@ -8,6 +8,7 @@ type HTMLElement struct {
 	Events        []HTMLEventType
 	Attributes    map[string]string
 	Hidden        bool
+	Depth         int
 }
 
 // HTMLElementType tag name

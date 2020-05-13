@@ -66,6 +66,7 @@ type Element struct {
 	characterData  string            // the character data (if any, #text only)
 	childNodeCount int               // the number of children this element has
 	nodeType       int               // the DOM nodeType
+	depth          int               // depth of the node in the document
 	tab            *Tab              // reference to the containing tab
 	node           *gcdapi.DOMNode   // the dom node, taken from the document
 	readyGate      chan struct{}     // gate to close upon recieving all information from the debugger service
@@ -74,32 +75,34 @@ type Element struct {
 	invalidated    bool              // has this node been invalidated (removed?)
 }
 
-func newElement(tab *Tab, nodeID int) *Element {
+func newElement(tab *Tab, nodeID, depth int) *Element {
 	e := &Element{}
 	e.tab = tab
 	e.attributes = make(map[string]string)
 	e.readyGate = make(chan struct{})
 	e.lock = &sync.RWMutex{}
 	e.ID = nodeID
+	e.depth = depth
 	return e
 }
 
-func newReadyElement(tab *Tab, node *gcdapi.DOMNode) *Element {
+func newReadyElement(tab *Tab, node *gcdapi.DOMNode, depth int) *Element {
 	e := &Element{}
 	e.tab = tab
 	e.attributes = make(map[string]string)
 	e.readyGate = make(chan struct{})
 	e.nodeName = strings.ToLower(node.NodeName)
 	e.lock = &sync.RWMutex{}
-	e.populateElement(node)
+	e.populateElement(node, depth)
 	return e
 }
 
 // populate the Element with node data.
-func (e *Element) populateElement(node *gcdapi.DOMNode) {
+func (e *Element) populateElement(node *gcdapi.DOMNode, depth int) {
 	e.lock.Lock()
 	e.node = node
 	e.ID = node.NodeId
+	e.depth = depth
 	e.nodeType = node.NodeType
 	e.nodeName = strings.ToLower(node.NodeName)
 	e.childNodeCount = node.ChildNodeCount
@@ -148,6 +151,11 @@ func (e *Element) setInvalidated(invalid bool) {
 	e.lock.Lock()
 	e.invalidated = invalid
 	e.lock.Unlock()
+}
+
+// Depth of this node as relative to the <html> doc
+func (e *Element) Depth() int {
+	return e.depth
 }
 
 // WaitForReady If we are ready, just return, if we are not, wait for the readyGate

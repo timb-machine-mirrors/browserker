@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
@@ -337,21 +336,17 @@ func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 
 		if message.Params.ResponseHeaders == nil {
 			// we are in a request paused event
-
 			t.interceptedRequest(ctx, message)
 		} else {
 			// we are in a response paused event
-
 			t.interceptedResponse(ctx, message)
 		}
 	})
 }
 
 func (t *Tab) interceptedRequest(ctx *browserk.Context, message *gcdapi.FetchRequestPausedEvent) {
-	//log.Info().Msg("Fetch.requestPaused Request Event")
 	// we are in a request paused event
 	modified := GCDFetchRequestToIntercepted(message, t.container)
-	//log.Info().Msg("Calling request Hooks")
 	ctx.NextReq(t, modified)
 
 	reqParams := &gcdapi.FetchContinueRequestParams{
@@ -376,14 +371,13 @@ func (t *Tab) interceptedRequest(ctx *browserk.Context, message *gcdapi.FetchReq
 func (t *Tab) interceptedResponse(ctx *browserk.Context, message *gcdapi.FetchRequestPausedEvent) {
 	p := message.Params
 
-	//log.Info().Msg("Fetch.requestPaused Response Event")
 	respParams := &gcdapi.FetchFulfillRequestParams{
 		RequestId:    p.RequestId,
 		ResponseCode: p.ResponseStatusCode,
 	}
 
 	if !hasBody(p.ResponseHeaders) {
-		spew.Dump(p)
+		//spew.Dump(p)
 		respParams.ResponseHeaders = p.ResponseHeaders
 		t.t.Fetch.FulfillRequestWithParams(respParams)
 		return
@@ -391,13 +385,11 @@ func (t *Tab) interceptedResponse(ctx *browserk.Context, message *gcdapi.FetchRe
 
 	bodyStr, encoded, err := t.t.Fetch.GetResponseBody(p.RequestId)
 	if err != nil {
-		log.Warn().Err(err).Msg("unable to get body")
-		spew.Dump(p)
+		log.Warn().Err(err).Str("request_id", p.RequestId).Msg("unable to get body")
+		//spew.Dump(p)
 		t.t.Fetch.ContinueRequestWithParams(&gcdapi.FetchContinueRequestParams{
 			RequestId: p.RequestId,
 		})
-		//respParams.Body = base64.StdEncoding.EncodeToString([]byte(""))
-		//t.t.Fetch.FulfillRequestWithParams(respParams)
 		return
 	}
 

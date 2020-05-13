@@ -190,6 +190,7 @@ func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error
 
 		tag, _ := ele.GetTagName()
 		b.Attributes, _ = ele.GetAttributes()
+		b.Depth = ele.Depth()
 		listeners, err := ele.GetEventListeners()
 		if err == nil {
 			for _, listener := range listeners {
@@ -208,7 +209,6 @@ func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error
 		}
 		bElements = append(bElements, b)
 	}
-	spew.Dump(bElements)
 	return bElements, nil
 }
 
@@ -273,7 +273,7 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 	case <-t.navigationCh:
 	}
 
-	stableTimer := time.After(15 * time.Second)
+	stableTimer := time.After(5 * time.Second)
 
 	// wait for DOM & network stability
 	log.Info().Msg("waiting for nav stability complete")
@@ -522,11 +522,11 @@ func (t *Tab) getDocument() (*Element, error) {
 		return nil, err
 	}
 	log.Info().Msg("getDocument called")
-
+	spew.Dump(doc)
 	t.setTopNodeID(doc.NodeId)
 	t.setTopFrameID(doc.FrameId)
 
-	t.addNodes(doc)
+	t.addNodes(doc, 0)
 	eleDoc, _ := t.getElement(doc.NodeId)
 	return eleDoc, nil
 }
@@ -541,9 +541,9 @@ func (t *Tab) GetDocument() (*Element, error) {
 }
 
 // getElementByNodeID returns either an element from our list of ready/known nodeIDs or a new un-ready element
-// If it's not ready we return false. Note this does have a sIDe effect of adding a potentially
-// invalID element to our list of known elements. But it is assumed this method will be called
-// with a valID nodeID that chrome has not informed us about yet. Once we are informed, we need
+// If it's not ready we return false. Note this does have a side effect of adding a potentially
+// invalid element to our list of known elements. But it is assumed this method will be called
+// with a valid nodeID that chrome has not informed us about yet. Once we are informed, we need
 // to update it via our list and not some reference that could disappear.
 func (t *Tab) getElementByNodeID(nodeID int) (*Element, bool) {
 	t.eleMutex.RLock()
@@ -552,7 +552,7 @@ func (t *Tab) getElementByNodeID(nodeID int) (*Element, bool) {
 	if ok {
 		return ele, true
 	}
-	newEle := newElement(t, nodeID)
+	newEle := newElement(t, nodeID, 0)
 	t.eleMutex.Lock()
 	t.elements[nodeID] = newEle // add non-ready element to our list.
 	t.eleMutex.Unlock()
@@ -584,11 +584,11 @@ func (t *Tab) GetAllElements() map[int]*Element {
 // GetElementByID returns the element by searching the top level document for an element with attributeID
 // Does not work on frames.
 func (t *Tab) GetElementByID(attributeID string) (*Element, bool, error) {
-	return t.GetDocumentElementByID(t.getTopNodeID(), attributeID)
+	return t.getDocumentElementByID(t.getTopNodeID(), attributeID)
 }
 
-// GetDocumentElementByID returns an element from a specific Document.
-func (t *Tab) GetDocumentElementByID(docNodeID int, attributeID string) (*Element, bool, error) {
+// getDocumentElementByID returns an element from a specific Document.
+func (t *Tab) getDocumentElementByID(docNodeID int, attributeID string) (*Element, bool, error) {
 	var err error
 
 	docNode, ok := t.getElement(docNodeID)
@@ -792,12 +792,12 @@ func (t *Tab) requestChildNodes(nodeID, depth int) {
 
 // Called if the element is known about but not yet populated. If it is not
 // known, we create a new element. If it is known we populate it and return it.
-func (t *Tab) nodeToElement(node *gcdapi.DOMNode) *Element {
+func (t *Tab) nodeToElement(node *gcdapi.DOMNode, depth int) *Element {
 	if ele, ok := t.getElement(node.NodeId); ok {
-		ele.populateElement(node)
+		ele.populateElement(node, depth)
 		return ele
 	}
-	newEle := newReadyElement(t, node)
+	newEle := newReadyElement(t, node, depth)
 	return newEle
 }
 
@@ -813,22 +813,22 @@ func (t *Tab) getElement(nodeID int) (*Element, bool) {
 // iterates over children and contentdocuments (if they exist)
 // Calls requestchild nodes for each node so we can receive setChildNode
 // events for even more nodes
-func (t *Tab) addNodes(node *gcdapi.DOMNode) {
-	newEle := t.nodeToElement(node)
+func (t *Tab) addNodes(node *gcdapi.DOMNode, depth int) {
+	newEle := t.nodeToElement(node, depth)
 
 	t.eleMutex.Lock()
 	t.elements[newEle.ID] = newEle
 	t.eleMutex.Unlock()
 	//log.Printf("Added new element: %s\n", newEle)
-	t.requestChildNodes(newEle.ID, 1)
+	//t.requestChildNodes(newEle.ID, 1)
 	if node.Children != nil {
 		// add child nodes
 		for _, v := range node.Children {
-			t.addNodes(v)
+			t.addNodes(v, depth+1)
 		}
 	}
 	if node.ContentDocument != nil {
-		t.addNodes(node.ContentDocument)
+		t.addNodes(node.ContentDocument, depth+1)
 	}
 	t.lastNodeChangeTimeVal.Store(time.Now())
 }
@@ -931,10 +931,11 @@ func (t *Tab) handleNodeChange(change *NodeChangeEvent) {
 // setChildNode event handling will add nodes to our elements map and update
 // the parent reference Children
 func (t *Tab) handleSetChildNodes(parentNodeID int, nodes []*gcdapi.DOMNode) {
-	for _, node := range nodes {
-		t.addNodes(node)
-	}
 	parent, ok := t.getElementByNodeID(parentNodeID)
+	depth := parent.Depth() + 1
+	for _, node := range nodes {
+		t.addNodes(node, depth)
+	}
 	if ok {
 		if err := parent.WaitForReady(); err == nil {
 			parent.addChildren(nodes)
@@ -950,9 +951,10 @@ func (t *Tab) handleChildNodeInserted(parentNodeID int, node *gcdapi.DOMNode) {
 	if node == nil {
 		return
 	}
-	t.addNodes(node)
-
 	parent, _ := t.getElementByNodeID(parentNodeID)
+	depth := parent.Depth() + 1
+	t.addNodes(node, depth)
+
 	// make sure we have the parent before we add children
 	if err := parent.WaitForReady(); err == nil {
 		parent.addChild(node)
