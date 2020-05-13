@@ -7,6 +7,7 @@ type HTMLElement struct {
 	Location      string
 	Events        []HTMLEventType
 	Attributes    map[string]string
+	Hidden        bool
 }
 
 // HTMLElementType tag name

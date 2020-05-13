@@ -288,7 +288,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 	})
 
 	t.t.Subscribe("Network.responseReceived", func(target *gcd.ChromeTarget, payload []byte) {
-		t.container.DecRequest()
+
 		message := &gcdapi.NetworkResponseReceivedEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {
 			return
@@ -296,10 +296,11 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		p := message.Params
 		//log.Info().Int32("pending", t.container.OpenRequestCount()).Str("url", p.Response.Url).Str("request_id", message.Params.RequestId).Msg("waiting")
 
-		timeoutCtx, cancel := context.WithTimeout(ctx.Ctx, time.Second*60)
+		timeoutCtx, cancel := context.WithTimeout(ctx.Ctx, time.Second*10)
 		defer cancel()
 
 		if err := t.container.WaitFor(timeoutCtx, p.RequestId); err != nil {
+			t.container.DecRequest() // we never got the response so decrement
 			return
 		}
 		bodyStr, encoded, err := t.t.Network.GetResponseBody(message.Params.RequestId)
@@ -317,6 +318,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 	})
 
 	t.t.Subscribe("Network.loadingFinished", func(target *gcd.ChromeTarget, payload []byte) {
+		t.container.DecRequest()
 		message := &gcdapi.NetworkLoadingFinishedEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {
 			return
@@ -333,11 +335,14 @@ func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 			log.Fatal().Err(err).Msg("critical error Fetch.requestPaused event was unable to decode")
 		}
 
-		// we are in a response paused event
-		if message.Params.ResponseHeaders != nil {
-			t.interceptedResponse(ctx, message)
-		} else {
+		if message.Params.ResponseHeaders == nil {
+			// we are in a request paused event
+
 			t.interceptedRequest(ctx, message)
+		} else {
+			// we are in a response paused event
+
+			t.interceptedResponse(ctx, message)
 		}
 	})
 }
