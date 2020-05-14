@@ -4,43 +4,6 @@ import (
 	"context"
 )
 
-// ActionType defines the action type for a browser action
-type ActionType int8
-
-// revive:disable:var-naming
-const (
-	ActLoadURL ActionType = iota + 1
-	ActExecuteJS
-	ActLeftClick
-	ActLeftClickDown
-	ActLeftClickUp
-	ActRightClick
-	ActRightClickDown
-	ActRightClickUp
-	ActMiddleClick
-	ActMiddleClickDown
-	ActMiddleClickUp
-	ActScroll
-	ActSendKeys
-	ActKeyUp
-	ActKeyDown
-	ActHover
-	ActFocus
-	ActWait
-
-	// ActionTypes that occured automatically
-	ActRedirect
-	ActSubRequest
-)
-
-// Action runs a browser action, may or may not create a result
-type Action struct {
-	browser Browser
-	Type    ActionType `graph:"type"`
-	Input   []byte     `graph:"input"`
-	Result  []byte     `graph:"result"`
-}
-
 // BrowserPool handles taking/returning browsers
 type BrowserPool interface {
 	Take(ctx *Context) (Browser, string, error)
@@ -63,6 +26,7 @@ type Browser interface {
 	GetConsoleEvents() []*ConsoleEvent
 	Navigate(ctx context.Context, url string) (err error)
 	FindElements(querySelector string) ([]*HTMLElement, error)
+	FindForms() ([]*HTMLFormElement, error)
 	GetMessages() ([]*HTTPMessage, error)
 	Screenshot(ctx context.Context) (string, error)
 	ExecuteAction(ctx context.Context, act *Action) ([]byte, bool, error) // result, caused page load, err

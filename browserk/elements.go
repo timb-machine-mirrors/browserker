@@ -1,14 +1,111 @@
 package browserk
 
+import (
+	"crypto/md5"
+	"sort"
+	"strings"
+)
+
 // HTMLElement type
 type HTMLElement struct {
 	Type          HTMLElementType
 	CustomTagName string
-	Location      string
 	Events        []HTMLEventType
 	Attributes    map[string]string
 	Hidden        bool
 	Depth         int
+	ID            []byte
+}
+
+// Hash the element to (hopefully) a unique value
+// Don't include depth as it may change but we can check that individually
+// for optimization purposes
+func (h *HTMLElement) Hash() []byte {
+	if h.ID != nil {
+		return h.ID
+	}
+	hash := md5.New()
+	vals := ImportantAttributeValues(h.Type, h.Attributes)
+	sorted := strings.Join(sort.StringSlice(vals), "")
+	hash.Write([]byte(sorted))
+	h.ID = hash.Sum(nil)
+	return h.ID
+}
+
+// HTMLFormElement and it's children
+type HTMLFormElement struct {
+	Events        []HTMLEventType
+	Attributes    map[string]string
+	Hidden        bool
+	Depth         int
+	ChildElements []*HTMLElement // capture all children (labels etc) so we can do context analysis
+	ID            []byte
+}
+
+// Hash the form and it's input elements to (hopefully) a unique value
+// Don't include depth as it may change but we can check that individually
+func (h *HTMLFormElement) Hash() []byte {
+	if h.ID != nil {
+		return h.ID
+	}
+	hash := md5.New()
+
+	vals := ImportantAttributeValues(FORM, h.Attributes)
+	for _, child := range h.ChildElements {
+		if child.Type != INPUT {
+			continue
+		}
+		vals = append(vals, ImportantAttributeValues(INPUT, child.Attributes)...)
+	}
+	sorted := strings.Join(sort.StringSlice(vals), "")
+	hash.Write([]byte(sorted))
+	h.ID = hash.Sum(nil)
+	return h.ID
+}
+
+// ImportantAttributeValues extracts the values for important attributes depending on HTMLElementType
+func ImportantAttributeValues(elementType HTMLElementType, attrs map[string]string) []string {
+	vals := make([]string, 0)
+	// TODO: Add more/all
+	for k, v := range attrs {
+		switch elementType {
+		case LINK:
+			switch k {
+			case "rel", "title":
+				vals = append(vals, v)
+			}
+		case FORM:
+			switch k {
+			case "action", "method":
+				vals = append(vals, v)
+			}
+		case INPUT:
+			switch k {
+			case "placeholder", "aria-label", "type":
+				vals = append(vals, v)
+			}
+		case META:
+			switch k {
+			case "property", "content":
+				vals = append(vals, v)
+			}
+		case A:
+			switch k {
+			case "href":
+				vals = append(vals, v)
+			}
+		case IMG, IFRAME, FRAME, SCRIPT, EMBED, OBJECT:
+			switch k {
+			case "src":
+				vals = append(vals, v)
+			}
+		}
+	}
+	// always add class if it exists
+	if class, ok := attrs["class"]; ok {
+		vals = append(vals, class)
+	}
+	return vals
 }
 
 // HTMLElementType tag name

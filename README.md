@@ -1,11 +1,11 @@
 # Browserker
 
-An open source web application scanner built for 2020, meant for CI/CD automation, not pen-testing.
+An open source web application scanner built for 2020, meant for SPAs and CI/CD automation not pen-testing.
 
 ## Features / Goals
 
 - A proxy-less scanner, based entirely off injecting and instrumenting chromium via the dev tools protocol.
-  - If chromium removes specific interception features, plans are in place to modify a custom chromium build.
+  - If chromium removes specific interception features, plans are in place to create a custom chromium build.
 - Allows for plugins to be written in Go or JS (coming soon)
 - Allows plugins to be notified of various browser events:
   - Network requests

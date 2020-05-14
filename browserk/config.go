@@ -1,5 +1,6 @@
 package browserk
 
+// Credentials for logging into a target site
 type Credentials struct {
 	Username string
 	Password string
@@ -10,10 +11,13 @@ type Credentials struct {
 type AuthType int8
 
 const (
+	// Script based authentication
 	Script AuthType = iota
+	// Raw POST / whatever
 	Raw
 )
 
+// Config for browserker
 type Config struct {
 	URL          string
 	AllowedURLs  []string // considered 'in scope' for testing/access

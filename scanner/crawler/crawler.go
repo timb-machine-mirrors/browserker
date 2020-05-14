@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
 )
 
@@ -85,15 +86,15 @@ func (b *BrowserkCrawler) buildResult(result *browserk.NavigationResult, start t
 	result.ConsoleEvents = browser.GetConsoleEvents()
 }
 
-// FindNewNav potentials
+// FindNewNav potentials TODO: get navigation entry metadata (is vuejs/react etc) to be more specific
 func (b *BrowserkCrawler) FindNewNav(ctx context.Context, result *browserk.NavigationResult, browser browserk.Browser) []*browserk.Navigation {
-	//formElements, err := browser.Find(ctx, browserk.FORM)
+	// Pull out forms (highest priority)
+	formElements, err := browser.FindForms()
+	if err != nil {
+		log.Info().Err(err).Msg("error while extracting forms")
+	}
 
-	// pull out links
-
-	// Pull out forms
-
-	// Pull out event listeners on elements
+	// pull out links (lower priority)
 
 	return nil
 }

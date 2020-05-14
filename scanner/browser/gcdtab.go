@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -174,7 +173,7 @@ func (t *Tab) ID() int64 {
 	return t.id
 }
 
-// FindElements elements via querySelector
+// FindElements elements via querySelector, does not pull out children
 func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error) {
 	t.handleDocumentUpdated() // refresh Document
 	elements, err := t.GetElementsBySelector(querySelector)
@@ -183,33 +182,35 @@ func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error
 	}
 	bElements := make([]*browserk.HTMLElement, 0)
 	for _, ele := range elements {
-		var ok bool
-
-		b := &browserk.HTMLElement{Events: make([]browserk.HTMLEventType, 0)}
-		b.Type = browserk.CUSTOM
-
-		tag, _ := ele.GetTagName()
-		b.Attributes, _ = ele.GetAttributes()
-		b.Depth = ele.Depth()
-		listeners, err := ele.GetEventListeners()
-		if err == nil {
-			for _, listener := range listeners {
-				eventType, ok := browserk.HTMLEventTypeMap[listener.Type]
-				if !ok {
-					eventType = browserk.HTMLEventcustom
-				}
-				b.Events = append(b.Events, eventType)
-			}
-		}
-		b.Location = ""
-
-		b.Type, ok = browserk.HTMLTypeMap[strings.ToUpper(tag)]
-		if !ok {
-			b.CustomTagName = tag
-		}
-		bElements = append(bElements, b)
+		bElements = append(bElements, ElementToHTMLElement(ele))
 	}
 	return bElements, nil
+}
+
+// FindForms finds forms and pulls out all child elements.
+// we may need more than just input fields (labels) etc for context
+func (t *Tab) FindForms() ([]*browserk.HTMLFormElement, error) {
+	t.handleDocumentUpdated() // refresh Document
+	elements, err := t.GetElementsBySelector("form")
+	if err != nil {
+		return nil, err
+	}
+	fElements := make([]*browserk.HTMLFormElement, 0)
+	for _, form := range elements {
+		f := &browserk.HTMLFormElement{
+			Events:        make([]browserk.HTMLEventType, 0),
+			ChildElements: make([]*browserk.HTMLElement, 0),
+		}
+
+		childNodes, _ := form.GetChildNodeIds()
+		for _, childID := range childNodes {
+			child, _ := t.getElementByNodeID(childID)
+			child.WaitForReady()
+			f.ChildElements = append(f.ChildElements, ElementToHTMLElement(child))
+		}
+		fElements = append(fElements, f)
+	}
+	return fElements, nil
 }
 
 // GetMessages that occurred since last called
