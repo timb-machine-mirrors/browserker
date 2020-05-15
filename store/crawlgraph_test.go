@@ -3,9 +3,10 @@ package store_test
 import (
 	"os"
 	"testing"
-	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"gitlab.com/browserker/browserk"
+	"gitlab.com/browserker/mock"
 	"gitlab.com/browserker/store"
 )
 
@@ -17,7 +18,7 @@ func TestCrawlNavExists(t *testing.T) {
 	}
 	defer g.Close()
 
-	nav := testMakeNavi([]byte{0, 1, 2})
+	nav := mock.MakeMockNavi([]byte{0, 1, 2})
 	nav.OriginID = []byte{}
 	if err := g.AddNavigation(nav); err != nil {
 		t.Fatalf("error adding: %s\n", err)
@@ -26,7 +27,7 @@ func TestCrawlNavExists(t *testing.T) {
 		t.Fatalf("nav should have existed")
 	}
 
-	nonExist := testMakeNavi([]byte{0, 2, 2})
+	nonExist := mock.MakeMockNavi([]byte{0, 2, 2})
 	if g.NavExists(nonExist) {
 		t.Fatalf("nav should NOT existed")
 	}
@@ -39,7 +40,7 @@ func TestCrawlOpenClose(t *testing.T) {
 		t.Fatalf("error init graph: %s\n", err)
 	}
 	defer g.Close()
-	nav := testMakeNavi([]byte{0, 1, 2})
+	nav := mock.MakeMockNavi([]byte{0, 1, 2})
 	nav.OriginID = []byte{}
 	if err := g.AddNavigation(nav); err != nil {
 		t.Fatalf("error adding: %s\n", err)
@@ -66,7 +67,7 @@ func TestCrawlGraph(t *testing.T) {
 	}
 	defer g.Close()
 
-	nav := testMakeNavi([]byte{0, 1, 2})
+	nav := mock.MakeMockNavi([]byte{0, 1, 2})
 	nav.OriginID = []byte{}
 
 	if err := g.AddNavigation(nav); err != nil {
@@ -103,7 +104,7 @@ func TestCrawlAddMultiple(t *testing.T) {
 	defer g.Close()
 
 	for i := 1; i < 11; i++ {
-		nav := testMakeNavi([]byte{0, byte(i), 2})
+		nav := mock.MakeMockNavi([]byte{0, byte(i), 2})
 		nav.OriginID = []byte{0, byte(i - 1), 2}
 		nav.Distance = i - 1
 
@@ -147,16 +148,30 @@ func TestCrawlAddMultiple(t *testing.T) {
 	}
 }
 
-func testMakeNavi(id []byte) *browserk.Navigation {
-	return &browserk.Navigation{
-		ID:               id,
-		StateUpdatedTime: time.Now(),
-		TriggeredBy:      1,
-		State:            browserk.NavUnvisited,
-		Action: &browserk.Action{
-			Type:   browserk.ActLoadURL,
-			Input:  nil,
-			Result: nil,
-		},
+func TestCrawlAddResults(t *testing.T) {
+	path := "testdata/results/crawl"
+	os.RemoveAll(path)
+
+	g := store.NewCrawlGraph(path)
+	if err := g.Init(); err != nil {
+		t.Fatalf("error init graph: %s\n", err)
 	}
+	defer g.Close()
+
+	for i := 1; i < 3; i++ {
+		navResult := mock.MakeMockResult([]byte{0, byte(i), 2})
+
+		if err := g.AddResult(navResult); err != nil {
+			t.Fatalf("error adding: %s\n", err)
+		}
+	}
+
+	res, err := g.GetNavigationResult([]byte{0, 1, 2})
+	if err != nil {
+		t.Fatalf("error getting nav result: %s\n", err)
+	}
+	if res.DOM != "<html>nav result</html>" {
+		t.Fatalf("expected %s got [%s]", "<html>nav result</html>", res.DOM)
+	}
+	spew.Dump(res)
 }

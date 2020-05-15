@@ -48,6 +48,11 @@ func EncodeState(state browserk.NavState) ([]byte, error) {
 	return msgpack.Marshal(state)
 }
 
+// EncodeBytes value
+func EncodeBytes(data []byte) ([]byte, error) {
+	return msgpack.Marshal(data)
+}
+
 // EncodeTime usually Now
 func EncodeTime(t time.Time) ([]byte, error) {
 	return msgpack.Marshal(t)

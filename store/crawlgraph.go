@@ -6,6 +6,7 @@ import (
 	"os"
 	"reflect"
 
+	"github.com/davecgh/go-spew/spew"
 	badger "github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -123,10 +124,19 @@ func (g *CrawlGraph) AddResult(result *browserk.NavigationResult) error {
 	return g.GraphStore.Update(func(txn *badger.Txn) error {
 		for i := 0; i < len(g.navResultPredicates); i++ {
 			key := MakeKey(result.ID, g.navResultPredicates[i].name)
-
 			rv := reflect.ValueOf(*result)
 			bytez, err := Encode(rv, g.navResultPredicates[i].index)
+
+			if g.navResultPredicates[i].name == "r_nav_id" {
+				navKey := MakeKey(result.NavigationID, g.navResultPredicates[i].name)
+				txn.Set(navKey, bytez) // store this separately so we can it look it up
+				log.Info().Msg("SPECIAL CASE")
+				spew.Dump(navKey)
+				spew.Dump(bytez)
+			}
+
 			if err != nil {
+				log.Error().Err(err).Msg("failed to encode nav result")
 				return err
 			}
 			// key = <id>:<predicate>, value = msgpack'd bytes
@@ -178,10 +188,13 @@ func (g *CrawlGraph) GetNavigationResult(navID []byte) (*browserk.NavigationResu
 	exist := &browserk.NavigationResult{}
 	err := g.GraphStore.View(func(txn *badger.Txn) error {
 		var err error
-		key := MakeKey(navID, "r_nav_id")
+
+		bNavID, _ := EncodeBytes(navID)
+		key := MakeKey(bNavID, "r_nav_id")
 		item, err := txn.Get(key)
 		if err == badger.ErrKeyNotFound {
 			log.Error().Err(err).Msg("failed to find result navID")
+			spew.Dump(key)
 			return nil
 		}
 		retVal, err := item.ValueCopy(nil)
