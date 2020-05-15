@@ -60,9 +60,7 @@ func (b *BrowserkCrawler) Process(ctx *browserk.Context, browser browserk.Browse
 	// find new potential navigation entries (if isFinal)
 	potentialNavs := make([]*browserk.Navigation, 0)
 	if isFinal {
-		navCtx, cancel := context.WithTimeout(ctx.Ctx, time.Second*15)
-		defer cancel()
-		potentialNavs = b.FindNewNav(navCtx, result, browser)
+		potentialNavs = b.FindNewNav(entry, browser)
 	}
 	return result, potentialNavs, nil
 }
@@ -84,17 +82,34 @@ func (b *BrowserkCrawler) buildResult(result *browserk.NavigationResult, start t
 	result.Cookies = browserk.DiffCookies(result.Cookies, cookies)
 	result.StorageEvents = browser.GetStorageEvents()
 	result.ConsoleEvents = browser.GetConsoleEvents()
+	result.Hash()
 }
 
 // FindNewNav potentials TODO: get navigation entry metadata (is vuejs/react etc) to be more specific
-func (b *BrowserkCrawler) FindNewNav(ctx context.Context, result *browserk.NavigationResult, browser browserk.Browser) []*browserk.Navigation {
+func (b *BrowserkCrawler) FindNewNav(entry *browserk.Navigation, browser browserk.Browser) []*browserk.Navigation {
+	navs := make([]*browserk.Navigation, 0)
 	// Pull out forms (highest priority)
 	formElements, err := browser.FindForms()
 	if err != nil {
 		log.Info().Err(err).Msg("error while extracting forms")
+	} else if formElements != nil {
+		log.Debug().Int("form_count", len(formElements)).Msg("found new forms")
+		for _, form := range formElements {
+			navs = append(navs, browserk.NewNavigationFromForm(entry, browserk.TrigCrawler, form))
+		}
 	}
 
 	// pull out links (lower priority)
+	aElements, err := browser.FindElements("a")
+	if err != nil {
+		log.Info().Err(err).Msg("error while extracting links")
+	} else if aElements != nil {
+		log.Debug().Int("link_count", len(aElements)).Msg("found new forms")
+		for _, a := range aElements {
+			navs = append(navs, browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, a, browserk.ActLeftClick))
+		}
+	}
 
-	return nil
+	// todo pull out additional clickable/whateverable elements
+	return navs
 }

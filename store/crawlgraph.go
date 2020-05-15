@@ -18,10 +18,11 @@ type NavGraphField struct {
 }
 
 type CrawlGraph struct {
-	GraphStore    *badger.DB
-	RequestStore  *badger.DB
-	filepath      string
-	navPredicates []*NavGraphField
+	GraphStore          *badger.DB
+	RequestStore        *badger.DB
+	filepath            string
+	navPredicates       []*NavGraphField
+	navResultPredicates []*NavGraphField
 }
 
 // NewCrawlGraph creates a new crawl graph and request store
@@ -48,6 +49,7 @@ func (g *CrawlGraph) Init() error {
 	}
 
 	g.navPredicates = g.discoverPredicates(&browserk.Navigation{})
+	g.navResultPredicates = g.discoverPredicates(&browserk.NavigationResult{})
 	return nil
 }
 
@@ -76,6 +78,54 @@ func (g *CrawlGraph) AddNavigation(nav *browserk.Navigation) error {
 
 			rv := reflect.ValueOf(*nav)
 			bytez, err := Encode(rv, g.navPredicates[i].index)
+			if err != nil {
+				return err
+			}
+			// key = <id>:<predicate>, value = msgpack'd bytes
+			txn.Set(key, bytez)
+		}
+		return nil
+	})
+}
+
+// AddNavigations entries into our graph and requests into request store
+func (g *CrawlGraph) AddNavigations(navs []*browserk.Navigation) error {
+	if navs == nil {
+		return nil
+	}
+
+	return g.GraphStore.Update(func(txn *badger.Txn) error {
+		for _, nav := range navs {
+
+			if err := g.AddNavigation(nav); err != nil {
+				log.Warn().Err(err).Msg("failed to add navigation")
+				return nil
+			}
+
+			for i := 0; i < len(g.navPredicates); i++ {
+				key := MakeKey(nav.ID, g.navPredicates[i].name)
+
+				rv := reflect.ValueOf(*nav)
+				bytez, err := Encode(rv, g.navPredicates[i].index)
+				if err != nil {
+					return err
+				}
+				// key = <id>:<predicate>, value = msgpack'd bytes
+				txn.Set(key, bytez)
+			}
+		}
+		return nil
+	})
+}
+
+// AddResult of a navigation
+func (g *CrawlGraph) AddResult(result *browserk.NavigationResult) error {
+	return g.GraphStore.Update(func(txn *badger.Txn) error {
+		for i := 0; i < len(g.navResultPredicates); i++ {
+			key := MakeKey(result.ID, g.navResultPredicates[i].name)
+
+			rv := reflect.ValueOf(*result)
+			bytez, err := Encode(rv, g.navResultPredicates[i].index)
 			if err != nil {
 				return err
 			}
@@ -119,6 +169,27 @@ func (g *CrawlGraph) GetNavigation(id []byte) (*browserk.Navigation, error) {
 		var err error
 
 		exist, err = DecodeNavigation(txn, g.navPredicates, id)
+		return err
+	})
+	return exist, err
+}
+
+func (g *CrawlGraph) GetNavigationResult(navID []byte) (*browserk.NavigationResult, error) {
+	exist := &browserk.NavigationResult{}
+	err := g.GraphStore.View(func(txn *badger.Txn) error {
+		var err error
+		key := MakeKey(navID, "r_nav_id")
+		item, err := txn.Get(key)
+		if err == badger.ErrKeyNotFound {
+			log.Error().Err(err).Msg("failed to find result navID")
+			return nil
+		}
+		retVal, err := item.ValueCopy(nil)
+		if err != nil {
+			return err
+		}
+
+		exist, err = DecodeNavigationResult(txn, g.navResultPredicates, retVal)
 		return err
 	})
 	return exist, err

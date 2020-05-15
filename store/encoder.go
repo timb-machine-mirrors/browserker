@@ -78,6 +78,134 @@ func DecodeNavigation(txn *badger.Txn, predicates []*NavGraphField, nodeID []byt
 	return nav, nil
 }
 
+// DecodeNavigationResult takes a transaction and a nodeID and returns a navigation object or err
+func DecodeNavigationResult(txn *badger.Txn, predicates []*NavGraphField, nodeID []byte) (*browserk.NavigationResult, error) {
+	nav := &browserk.NavigationResult{}
+
+	fields := make([]PredicateField, len(predicates))
+	for i := 0; i < len(predicates); i++ {
+		name := predicates[i].name
+		key := MakeKey(nodeID, name)
+		p := PredicateField{key: key, name: name}
+		fields[i] = p
+	}
+
+	for _, pred := range fields {
+		item, err := txn.Get(pred.key)
+		if err != nil {
+			return nil, err
+		}
+		if err := DecodeNavigationResultItem(item, nav, pred.name); err != nil {
+			return nil, err
+		}
+	}
+
+	return nav, nil
+}
+
+// DecodeNavigationResultItem of the predicate value into the navigation result object.
+// TODO autogenerate this
+func DecodeNavigationResultItem(item *badger.Item, nav *browserk.NavigationResult, pred string) error {
+	var err error
+
+	switch pred {
+	case "r_id":
+		err = item.Value(func(val []byte) error {
+			var b []byte
+			err := msgpack.Unmarshal(val, &b)
+			nav.ID = b
+			return err
+		})
+	case "r_nav_id":
+		err = item.Value(func(val []byte) error {
+			var b []byte
+			err := msgpack.Unmarshal(val, &b)
+			nav.NavigationID = b
+			return err
+		})
+	case "r_dom":
+		err = item.Value(func(val []byte) error {
+			var v string
+			err := msgpack.Unmarshal(val, &v)
+			nav.DOM = v
+			return err
+		})
+	case "r_start_url":
+		err = item.Value(func(val []byte) error {
+			var v string
+			err := msgpack.Unmarshal(val, &v)
+			nav.StartURL = v
+			return err
+		})
+	case "r_end_url":
+		err = item.Value(func(val []byte) error {
+			var v string
+			err := msgpack.Unmarshal(val, &v)
+			nav.EndURL = v
+			return err
+		})
+	case "r_message_count":
+		err = item.Value(func(val []byte) error {
+			var v int
+			err := msgpack.Unmarshal(val, &v)
+			nav.MessageCount = v
+			return err
+		})
+	case "r_messages":
+		err = item.Value(func(val []byte) error {
+			v := make([]*browserk.HTTPMessage, 0)
+			err := msgpack.Unmarshal(val, &v)
+			nav.Messages = v
+			return err
+		})
+	case "r_cookies":
+		err = item.Value(func(val []byte) error {
+			v := make([]*browserk.Cookie, 0)
+			err := msgpack.Unmarshal(val, &v)
+			nav.Cookies = v
+			return err
+		})
+	case "r_console":
+		err = item.Value(func(val []byte) error {
+			v := make([]*browserk.ConsoleEvent, 0)
+			err := msgpack.Unmarshal(val, &v)
+			nav.ConsoleEvents = v
+			return err
+		})
+	case "r_storage":
+		err = item.Value(func(val []byte) error {
+			v := make([]*browserk.StorageEvent, 0)
+			err := msgpack.Unmarshal(val, &v)
+			nav.StorageEvents = v
+			return err
+		})
+	case "r_caused_load":
+		err = item.Value(func(val []byte) error {
+			var v bool
+			err := msgpack.Unmarshal(val, &v)
+			nav.CausedLoad = v
+			return err
+		})
+	case "r_was_error":
+		err = item.Value(func(val []byte) error {
+			var v bool
+			err := msgpack.Unmarshal(val, &v)
+			nav.WasError = v
+			return err
+		})
+	case "r_errors":
+		err = item.Value(func(val []byte) error {
+			var v []error
+			err := msgpack.Unmarshal(val, &v)
+			nav.Errors = v
+			return err
+		})
+	default:
+		panic("unknown predicate for navigation")
+	}
+	return err
+}
+
 // DecodeNavigationItem of the predicate value into the navigation object.
 // TODO autogenerate this
 func DecodeNavigationItem(item *badger.Item, nav *browserk.Navigation, pred string) error {

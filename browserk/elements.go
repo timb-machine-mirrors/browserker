@@ -19,7 +19,7 @@ type HTMLElement struct {
 
 // Hash the element to (hopefully) a unique value
 // Don't include depth as it may change but we can check that individually
-// for optimization purposes
+// for optimization purposes if Depth && ID == ...
 func (h *HTMLElement) Hash() []byte {
 	if h.ID != nil {
 		return h.ID
@@ -84,6 +84,11 @@ func ImportantAttributeValues(elementType HTMLElementType, attrs map[string]stri
 			case "placeholder", "aria-label", "type":
 				vals = append(vals, v)
 			}
+		case LABEL:
+			switch k {
+			case "for":
+				vals = append(vals, v)
+			}
 		case META:
 			switch k {
 			case "property", "content":
@@ -101,7 +106,8 @@ func ImportantAttributeValues(elementType HTMLElementType, attrs map[string]stri
 			}
 		}
 	}
-	// always add class if it exists
+	// always add class if it exists need to becareful for state switches (class = disabled etc)
+	// TODO: strip out disabled/other keywords
 	if class, ok := attrs["class"]; ok {
 		vals = append(vals, class)
 	}

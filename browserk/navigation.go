@@ -56,6 +56,7 @@ func NewNavigation(triggeredBy TriggeredBy, action *Action) *Navigation {
 		TriggeredBy:      triggeredBy,
 		State:            NavUnvisited,
 		StateUpdatedTime: time.Now(),
+		Scope:            In,
 	}
 
 	// TODO: add originID as part of new nav id for uniqueness?
@@ -67,23 +68,92 @@ func NewNavigation(triggeredBy TriggeredBy, action *Action) *Navigation {
 	return n
 }
 
-// NavigationResult captures result details about a navigation
-type NavigationResult struct {
-	ID            []byte          `graph:"res_id"`
-	NavigationID  []byte          `graph:"nav_id"`
-	DOM           string          `graph:"dom"`
-	StartURL      string          `graph:"start_url"`
-	EndURL        string          `graph:"end_url"`
-	MessageCount  int             `graph:"message_count"`
-	Messages      []*HTTPMessage  `graph:"messages"`
-	Cookies       []*Cookie       `graph:"cookies"`
-	ConsoleEvents []*ConsoleEvent `graph:"console"`
-	StorageEvents []*StorageEvent `graph:"storage"`
-	CausedLoad    bool            `graph:"caused_load"`
-	WasError      bool            `graph:"was_error"`
-	Errors        []error         `graph:"errors"`
+// NewNavigationFromForm creates a new navigation entry from forms
+func NewNavigationFromForm(from *Navigation, triggeredBy TriggeredBy, form *HTMLFormElement) *Navigation {
+
+	action := &Action{
+		Type:    ActFillForm,
+		Input:   nil,
+		Element: nil,
+		Form:    form,
+		Result:  nil,
+	}
+
+	n := &Navigation{
+		Action:           action,
+		OriginID:         from.ID,
+		TriggeredBy:      triggeredBy,
+		State:            NavUnvisited,
+		StateUpdatedTime: time.Now(),
+		Scope:            In,
+		Distance:         from.Distance + 1,
+	}
+
+	h := md5.New()
+	h.Write(n.OriginID)
+	h.Write(n.Action.Form.Hash())
+	n.ID = h.Sum(nil)
+	return n
 }
 
+// NewNavigationFromElement creates a new navigation entry from clickable elements
+func NewNavigationFromElement(from *Navigation, triggeredBy TriggeredBy, ele *HTMLElement, aType ActionType) *Navigation {
+
+	action := &Action{
+		Type:    aType,
+		Input:   nil,
+		Element: ele,
+		Form:    nil,
+		Result:  nil,
+	}
+
+	n := &Navigation{
+		Action:           action,
+		OriginID:         from.ID,
+		TriggeredBy:      triggeredBy,
+		State:            NavUnvisited,
+		StateUpdatedTime: time.Now(),
+		Scope:            In,
+		Distance:         from.Distance + 1,
+	}
+
+	h := md5.New()
+	h.Write(n.OriginID)
+	h.Write(n.Action.Element.Hash())
+	n.ID = h.Sum(nil)
+	return n
+}
+
+// NavigationResult captures result details about a navigation
+type NavigationResult struct {
+	ID            []byte          `graph:"r_id"`
+	NavigationID  []byte          `graph:"r_nav_id"`
+	DOM           string          `graph:"r_dom"`
+	StartURL      string          `graph:"r_start_url"`
+	EndURL        string          `graph:"r_end_url"`
+	MessageCount  int             `graph:"r_message_count"`
+	Messages      []*HTTPMessage  `graph:"r_messages"`
+	Cookies       []*Cookie       `graph:"r_cookies"`
+	ConsoleEvents []*ConsoleEvent `graph:"r_console"`
+	StorageEvents []*StorageEvent `graph:"r_storage"`
+	CausedLoad    bool            `graph:"r_caused_load"`
+	WasError      bool            `graph:"r_was_error"`
+	Errors        []error         `graph:"r_errors"`
+}
+
+// Hash a unique ID for this result (needs work)
+func (n *NavigationResult) Hash() []byte {
+	if n.ID != nil {
+		return n.ID
+	}
+	h := md5.New()
+	// TODO come up with something better
+	h.Write(n.NavigationID)
+	h.Write([]byte(n.StartURL))
+	h.Write([]byte(n.EndURL))
+	n.ID = h.Sum(nil)
+	return n.ID
+}
 func (n *NavigationResult) AddError(err error) {
 	if err != nil {
 		n.Errors = append(n.Errors, err)

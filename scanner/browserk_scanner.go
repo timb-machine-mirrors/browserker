@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"gitlab.com/browserker/browserk"
@@ -157,7 +158,7 @@ func (b *Browserk) crawl(entries [][]*browserk.Navigation) error {
 		crawler := crawler.New(b.cfg)
 		if err := crawler.Init(); err != nil {
 			b.browsers.Return(navCtx.Ctx, port)
-			return err
+			return errors.Wrap(err, "failed to init crawler")
 		}
 
 		for i, nav := range navs {
@@ -166,10 +167,23 @@ func (b *Browserk) crawl(entries [][]*browserk.Navigation) error {
 			navCtx.Ctx = ctx
 			defer cancel()
 
+			// we are on the last navigation of this path so we'll want to capture some stuff
 			if i == len(navs)-1 {
 				isFinal = true
 			}
-			crawler.Process(navCtx, browser, nav, isFinal)
+
+			result, newNavs, err := crawler.Process(navCtx, browser, nav, isFinal)
+			if err != nil {
+				log.Error().Err(err).Msg("failed to process action")
+			}
+
+			if err := b.crawlGraph.AddNavigations(newNavs); err != nil {
+				log.Error().Err(err).Msg("failed to add new navigations")
+			}
+
+			if err := b.crawlGraph.AddResult(result); err != nil {
+				log.Error().Err(err).Msg("failed to add result")
+			}
 		}
 		b.browsers.Return(navCtx.Ctx, port)
 	}
