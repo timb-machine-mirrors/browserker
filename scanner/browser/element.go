@@ -414,6 +414,11 @@ func (e *Element) GetCharacterData() (string, error) {
 	return e.characterData, nil
 }
 
+// GetInnerText of this element
+func (e *Element) GetInnerText() string {
+	return e.tab.GetChildrensCharacterData(e)
+}
+
 // IsEnabled returns true if the node is enabled, only makes sense for form controls.
 // Element must be in a ready state.
 func (e *Element) IsEnabled() (bool, error) {

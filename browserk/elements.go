@@ -12,6 +12,7 @@ type HTMLElement struct {
 	CustomTagName string
 	Events        []HTMLEventType
 	Attributes    map[string]string
+	InnerText     string
 	Hidden        bool
 	Depth         int
 	ID            []byte
@@ -26,6 +27,7 @@ func (h *HTMLElement) Hash() []byte {
 	}
 	hash := md5.New()
 	vals := ImportantAttributeValues(h.Type, h.Attributes)
+	vals = append(vals, h.InnerText)
 	sorted := strings.Join(sort.StringSlice(vals), "")
 	hash.Write([]byte(sorted))
 	h.ID = hash.Sum(nil)
@@ -474,6 +476,182 @@ var HTMLTypeMap = map[string]HTMLElementType{
 	"STRIKE":    STRIKE,
 	"TT":        TT,
 	"XMP":       XMP,
+}
+
+var HTMLTypeToStrMap = map[HTMLElementType]string{
+	HTML: "HTML",
+	// METADATA
+	BASE:  "BASE",
+	HEAD:  "HEAD",
+	LINK:  "LINK",
+	META:  "META",
+	STYLE: "STYLE",
+	TITLE: "TITLE",
+
+	// Sectioning Root
+	BODY: "BODY",
+
+	//Content
+	ADDRESS: "ADDRESS",
+	ARTICLE: "ARTICLE",
+	ASIDE:   "ASIDE",
+	FOOTER:  "FOOTER",
+	HEADER:  "HEADER",
+	H1:      "H1",
+	H2:      "H2",
+	H3:      "H3",
+	H4:      "H4",
+	H5:      "H5",
+	H6:      "H6",
+	HGROUP:  "HGROUP",
+	MAIN:    "MAIN",
+	NAV:     "NAV",
+	SECTION: "SECTION",
+
+	// Text
+	BLOCKQUOTE: "BLOCKQUOTE",
+	DD:         "DD",
+	DIV:        "DIV",
+	DL:         "DL",
+	DT:         "DT",
+	FIGCAPTION: "FIGCAPTION",
+	FIGURE:     "FIGURE",
+	HR:         "HR",
+	LI:         "LI",
+	// MAIN
+	OL:  "OL",
+	P:   "P",
+	PRE: "PRE",
+	UL:  "UL",
+
+	// Inline Text
+	A:      "A",
+	ABBR:   "ABBR",
+	B:      "B",
+	BDI:    "BDI",
+	BDO:    "BDO",
+	BR:     "BR",
+	CITE:   "CITE",
+	CODE:   "CODE",
+	DATA:   "DATA",
+	DFN:    "DFN",
+	EM:     "EM",
+	I:      "I",
+	KBD:    "KBD",
+	MARK:   "MARK",
+	Q:      "Q",
+	RB:     "RB",
+	RP:     "RP",
+	RT:     "RT",
+	RTC:    "RTC",
+	RUBY:   "RUBY",
+	S:      "S",
+	SAMP:   "SAMP",
+	SMALL:  "SMALL",
+	SPAN:   "SPAN",
+	STRONG: "STRONG",
+	SUB:    "SUB",
+	SUP:    "SUP",
+	TIME:   "TIME",
+	U:      "U",
+	VAR:    "VAR",
+	WBR:    "WBR",
+
+	// Image and Multimedia
+	AREA:  "AREA",
+	AUDIO: "AUDIO",
+	IMG:   "IMG",
+	MAP:   "MAP",
+	TRACK: "TRACK",
+	VIDEO: "VIDEO",
+
+	// Embedded
+	EMBED:   "EMBED",
+	IFRAME:  "IFRAME",
+	OBJECT:  "OBJECT",
+	PARAM:   "PARAM",
+	PICTURE: "PICTURE",
+	SOURCE:  "SOURCE",
+
+	// Scripting
+	CANVAS:   "CANVAS",
+	NOSCRIPT: "NOSCRIPT",
+	SCRIPT:   "SCRIPT",
+
+	// Demarcating
+	DEL: "DEL",
+	INS: "INS",
+
+	// Table Content
+	CAPTION:  "CAPTION",
+	COL:      "COL",
+	COLGROUP: "COLGROUP",
+	TABLE:    "TABLE",
+	TBODY:    "TBODY",
+	TD:       "TD",
+	TFOOT:    "TFOOT",
+	TH:       "TH",
+	THEAD:    "THEAD",
+	TR:       "TR",
+
+	// Forms
+	BUTTON:   "BUTTON",
+	DATALIST: "DATALIST",
+	FIELDSET: "FIELDSET",
+	FORM:     "FORM",
+	INPUT:    "INPUT",
+	LABEL:    "LABEL",
+	LEGEND:   "LEGEND",
+	METER:    "METER",
+	OPTGROUP: "OPTGROUP",
+	OPTION:   "OPTION",
+	OUTPUT:   "OUTPUT",
+	PROGRESS: "PROGRESS",
+	SELECT:   "SELECT",
+	TEXTAREA: "TEXTAREA",
+
+	// Interactive
+	DETAILS: "DETAILS",
+	DIALOG:  "DIALOG",
+	MENU:    "MENU",
+	SUMMARY: "SUMMARY",
+
+	// Web Components
+	SLOT:     "SLOT",
+	TEMPLATE: "TEMPLATE",
+
+	// Deprecated
+	ACRONYM:   "ACRONYM",
+	APPLET:    "APPLET",
+	BASEFONT:  "BASEFONT",
+	BGSOUND:   "BGSOUND",
+	BIG:       "BIG",
+	BLINK:     "BLINK",
+	CENTER:    "CENTER",
+	COMMAND:   "COMMAND",
+	CONTENT:   "CONTENT",
+	DIR:       "DIR",
+	ELEMENT:   "ELEMENT",
+	FONT:      "FONT",
+	FRAME:     "FRAME",
+	FRAMESET:  "FRAMESET",
+	IMAGE:     "IMAGE",
+	ISINDEX:   "ISINDEX",
+	KEYGEN:    "KEYGEN",
+	LISTING:   "LISTING",
+	MARQUEE:   "MARQUEE",
+	MENUITEM:  "MENUITEM",
+	MULTICOL:  "MULTICOL",
+	NEXTID:    "NEXTID",
+	NOBR:      "NOBR",
+	NOEMBED:   "NOEMBED",
+	NOFRAMES:  "NOFRAMES",
+	PLAINTEXT: "PLAINTEXT",
+	SHADOW:    "SHADOW",
+	SPACER:    "SPACER",
+	STRIKE:    "STRIKE",
+	TT:        "TT",
+	XMP:       "XMP",
 }
 
 // HTMLEventType for various HTML events

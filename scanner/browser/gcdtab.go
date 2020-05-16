@@ -95,6 +95,7 @@ func (t *Tab) Close() {
 
 // ExecuteAction for this browser, calling js handler after it is called
 func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, bool, error) {
+	var err error
 	causedLoad := false
 	// Call JSBefore hooks
 	t.ctx.NextJSBefore(t)
@@ -108,6 +109,18 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 	case browserk.ActExecuteJS:
 		t.InjectJS(string(act.Input))
 	case browserk.ActLeftClick:
+		ele, err := t.FindByHTMLElement(act.Element)
+		if err != nil {
+			return nil, false, err
+		}
+		err = ele.Click()
+		// add small delay after click
+		t := time.NewTimer(time.Millisecond * 200)
+		defer t.Stop()
+		select {
+		case <-t.C:
+		case <-ctx.Done():
+		}
 	case browserk.ActLeftClickDown:
 	case browserk.ActLeftClickUp:
 	case browserk.ActRightClick:
@@ -129,7 +142,7 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 	if docUpdated, ok := t.docWasUpdated.Load().(bool); ok {
 		causedLoad = docUpdated
 	}
-	return nil, causedLoad, nil
+	return nil, causedLoad, err
 }
 
 // Navigate to the url
@@ -171,6 +184,31 @@ func (t *Tab) setShutdownState(val bool) {
 // ID of this browser (tab)
 func (t *Tab) ID() int64 {
 	return t.id
+}
+
+// FindByHTMLElement returns a gcd Element for interacting
+func (t *Tab) FindByHTMLElement(ele *browserk.HTMLElement) (*Element, error) {
+	if ele == nil {
+		return nil, &ErrInvalidElement{}
+	}
+	tag := browserk.HTMLTypeToStrMap[ele.Type]
+	if ele.Type == browserk.CUSTOM {
+		tag = ele.CustomTagName
+	}
+
+	eles, err := t.GetElementsBySelector(tag)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, found := range eles {
+		h := ElementToHTMLElement(found)
+		if bytes.Compare(h.Hash(), ele.Hash()) == 0 && h.Depth == ele.Depth {
+			log.Info().Msg("found by nearly exact match")
+			return found, nil
+		}
+	}
+	return nil, &ElementNotFoundErr{}
 }
 
 // FindElements elements via querySelector, does not pull out children
@@ -523,7 +561,6 @@ func (t *Tab) getDocument() (*Element, error) {
 		return nil, err
 	}
 	log.Info().Msg("getDocument called")
-	spew.Dump(doc)
 	t.setTopNodeID(doc.NodeId)
 	t.setTopFrameID(doc.FrameId)
 
@@ -659,8 +696,7 @@ func (t *Tab) GetDocumentElementsBySelector(docNodeID int, selector string) ([]*
 	if !ok {
 		return nil, &ElementNotFoundErr{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
 	}
-	log.Info().Msgf("GOT DOCNODE")
-	spew.Dump(docNode)
+
 	nodeIDs, errQuery := t.t.DOM.QuerySelectorAll(docNode.ID, selector)
 	if errQuery != nil {
 		log.Info().Msgf("QuerySelectorAll Err: %#v", errQuery)
@@ -1089,6 +1125,7 @@ func (t *Tab) subscribeBrowserEvents(ctx *browserk.Context, intercept bool) {
 	t.subscribeChildNodeInserted()
 	t.subscribeChildNodeRemoved()
 
-	// misc
-	// t.subscribeStorageEvents(nil)
+	// events
+	t.subscribeStorageEvents()
+	t.subscribeConsoleEvents()
 }

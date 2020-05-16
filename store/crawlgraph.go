@@ -88,7 +88,8 @@ func (g *CrawlGraph) AddNavigation(nav *browserk.Navigation) error {
 	})
 }
 
-// AddNavigations entries into our graph and requests into request store
+// AddNavigations entries into our graph and requests into request store in
+// a single transaction
 func (g *CrawlGraph) AddNavigations(navs []*browserk.Navigation) error {
 	if navs == nil {
 		return nil

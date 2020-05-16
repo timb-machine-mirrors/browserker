@@ -186,7 +186,7 @@ func (t *Tab) subscribeDocumentUpdated() {
 	})
 }
 
-func (t *Tab) subscribeStorageEvents(storageFn StorageFunc) {
+func (t *Tab) subscribeStorageEvents() {
 	t.t.Subscribe("Storage.domStorageItemsCleared", func(target *gcd.ChromeTarget, payload []byte) {
 		message := &gcdapi.DOMStorageDomStorageItemsClearedEvent{}
 		if err := json.Unmarshal(payload, message); err == nil {
@@ -244,6 +244,25 @@ func (t *Tab) subscribeStorageEvents(storageFn StorageFunc) {
 				Type:           browserk.StorageUpdatedEvt,
 			}
 			t.container.AddStorageEvent(evt)
+		}
+	})
+}
+
+func (t *Tab) subscribeConsoleEvents() {
+	t.t.Subscribe("Console.messageAdded", func(target *gcd.ChromeTarget, payload []byte) {
+		message := &gcdapi.ConsoleMessageAddedEvent{}
+		if err := json.Unmarshal(payload, message); err == nil {
+			p := message.Params
+			evt := &browserk.ConsoleEvent{
+				Source:   p.Message.Source,
+				Level:    p.Message.Level,
+				Text:     p.Message.Text,
+				URL:      p.Message.Url,
+				Line:     p.Message.Line,
+				Column:   p.Message.Column,
+				Observed: time.Now(),
+			}
+			t.container.AddConsoleEvent(evt)
 		}
 	})
 }

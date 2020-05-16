@@ -2,6 +2,7 @@ package browser
 
 import "github.com/wirepair/gcd/gcdapi"
 
+// Click the x, y coords one time
 func (t *Tab) Click(x, y float64) error {
 	return t.click(x, y, 1)
 }
@@ -34,12 +35,12 @@ func (t *Tab) click(x, y float64, clickCount int) error {
 	return nil
 }
 
-// Issues a double click on the x, y coords provIDed.
+// DoubleClick issues a double click on the x, y coords provided.
 func (t *Tab) DoubleClick(x, y float64) error {
 	return t.click(x, y, 2)
 }
 
-// Moves the mouse to the x, y coords provIDed.
+// MoveMouse to the x, y coords provided.
 func (t *Tab) MoveMouse(x, y float64) error {
 	mouseMovedParams := &gcdapi.InputDispatchMouseEventParams{TheType: "mouseMoved",
 		X: x,
@@ -50,7 +51,7 @@ func (t *Tab) MoveMouse(x, y float64) error {
 	return err
 }
 
-// Sends keystrokes to whatever is focused, best called from Element.SendKeys which will
+// SendKeys to whatever is focused, best called from Element.SendKeys which will
 // try to focus on the element first. Use \n for Enter, \b for backspace or \t for Tab.
 func (t *Tab) SendKeys(text string) error {
 	inputParams := &gcdapi.InputDispatchKeyEventParams{TheType: "char"}

@@ -116,7 +116,39 @@ func TestCrawlAddMultiple(t *testing.T) {
 			t.Fatalf("error adding: %s\n", err)
 		}
 	}
+	testGetNavResults(t, g)
+}
 
+func TestCrawlAddNavigations(t *testing.T) {
+	path := "testdata/navis/crawl"
+	os.RemoveAll(path)
+
+	g := store.NewCrawlGraph(path)
+	if err := g.Init(); err != nil {
+		t.Fatalf("error init graph: %s\n", err)
+	}
+	defer g.Close()
+
+	navs := make([]*browserk.Navigation, 0)
+	for i := 1; i < 11; i++ {
+		nav := mock.MakeMockNavi([]byte{0, byte(i), 2})
+		nav.OriginID = []byte{0, byte(i - 1), 2}
+		nav.Distance = i - 1
+
+		if i == 1 {
+			nav.OriginID = []byte{} // signals root
+		}
+		navs = append(navs, nav)
+	}
+
+	if err := g.AddNavigations(navs); err != nil {
+		t.Fatalf("error calling  add navigations: %s\n", err)
+	}
+
+	testGetNavResults(t, g)
+}
+
+func testGetNavResults(t *testing.T, g browserk.CrawlGrapher) {
 	limit := 5
 	entries := g.Find(nil, browserk.NavUnvisited, browserk.NavUnvisited, int64(limit))
 	if len(entries) != limit {

@@ -8,6 +8,7 @@ import (
 	"gitlab.com/browserker/browserk"
 )
 
+// Container for various browser events
 type Container struct {
 	messageLock   sync.RWMutex
 	messages      map[string]*browserk.HTTPMessage
@@ -80,6 +81,7 @@ func (c *Container) SetLoadRequest(request *browserk.HTTPRequest) {
 	c.loadRequestID = request.RequestId
 }
 
+// GetRequest via requestID
 func (c *Container) GetRequest(requestID string) *browserk.HTTPRequest {
 	c.messageLock.RLock()
 	m, ok := c.messages[requestID]
@@ -90,6 +92,7 @@ func (c *Container) GetRequest(requestID string) *browserk.HTTPRequest {
 	return m.Request
 }
 
+// GetResponse via requestID
 func (c *Container) GetResponse(requestID string) *browserk.HTTPResponse {
 	c.messageLock.RLock()
 	m, ok := c.messages[requestID]
@@ -100,6 +103,7 @@ func (c *Container) GetResponse(requestID string) *browserk.HTTPResponse {
 	return m.Response
 }
 
+// GetMessage via requestID
 func (c *Container) GetMessage(requestID string) *browserk.HTTPMessage {
 	c.messageLock.RLock()
 	m, ok := c.messages[requestID]
