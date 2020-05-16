@@ -2,10 +2,12 @@ package clicmds
 
 import (
 	"context"
+	"io/ioutil"
 	"os"
 	"os/signal"
 	"syscall"
 
+	"github.com/pelletier/go-toml"
 	"github.com/rs/zerolog/log"
 	"github.com/urfave/cli/v2"
 	"gitlab.com/browserker/browserk"
@@ -23,7 +25,7 @@ func CrawlerFlags() []cli.Flag {
 		&cli.StringFlag{
 			Name:  "config",
 			Usage: "config to use",
-			Value: "browserk.toml",
+			Value: "",
 		},
 		&cli.StringFlag{
 			Name:  "datadir",
@@ -34,23 +36,39 @@ func CrawlerFlags() []cli.Flag {
 }
 
 func Crawler(ctx *cli.Context) error {
-	cfg := &browserk.Config{
-		URL:           ctx.String("url"),
-		AllowedHosts:  nil,
-		ExcludedHosts: nil,
-		DataPath:      "",
-		AuthScript:    "",
-		AuthType:      0,
-		Credentials: &browserk.Credentials{
-			Username: "",
-			Password: "",
-			Email:    "",
-		},
-		NumBrowsers: 3,
+	cfg := &browserk.Config{}
+	if ctx.String("config") == "" {
+		cfg = &browserk.Config{
+			URL:           ctx.String("url"),
+			AllowedHosts:  nil,
+			ExcludedHosts: nil,
+			DataPath:      "",
+			AuthScript:    "",
+			AuthType:      0,
+			Credentials: &browserk.Credentials{
+				Username: "",
+				Password: "",
+				Email:    "",
+			},
+			NumBrowsers: 3,
+		}
+	} else {
+		data, err := ioutil.ReadFile(ctx.String("config"))
+		if err != nil {
+			return err
+		}
+		toml.Unmarshal(data, cfg)
+		if cfg.URL == "" && ctx.String("url") != "" {
+			cfg.URL = ctx.String("url")
+		}
+		if cfg.DataPath == "" && ctx.String("datadir") != "" {
+			cfg.DataPath = ctx.String("datadir")
+		}
 	}
-	os.RemoveAll(ctx.String("datadir"))
-	crawl := store.NewCrawlGraph(ctx.String("datadir") + "/crawl")
-	attack := store.NewAttackGraph(ctx.String("datadir") + "/attack")
+
+	os.RemoveAll(cfg.DataPath)
+	crawl := store.NewCrawlGraph(cfg.DataPath + "/crawl")
+	attack := store.NewAttackGraph(cfg.DataPath + "/attack")
 	browserk := scanner.New(cfg, crawl, attack)
 	log.Logger.Info().Msg("Starting browserker")
 

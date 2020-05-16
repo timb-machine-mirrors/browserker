@@ -273,7 +273,7 @@ func (t *Tab) subscribeConsoleEvents() {
 // HOWEVER it does appear we can intercept them???
 func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 	t.t.Subscribe("network.loadingFailed", func(target *gcd.ChromeTarget, payload []byte) {
-		log.Info().Msgf("failed: %s\n", string(payload))
+		log.Info().Int64("browser_id", t.id).Msgf("failed: %s\n", string(payload))
 		t.container.DecRequest()
 	})
 
@@ -296,7 +296,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 			t.container.AddResponse(GCDResponseToBrowserk(fake, body))
 		}
 		t.container.AddRequest(req)
-		log.Debug().Int32("pending", t.container.OpenRequestCount()).Str("url", message.Params.Request.Url).Str("request_id", message.Params.RequestId).Msg("added request")
+		log.Debug().Int64("browser_id", t.id).Int32("pending", t.container.OpenRequestCount()).Str("url", message.Params.Request.Url).Str("request_id", message.Params.RequestId).Msg("added request")
 	})
 
 	t.t.Subscribe("Network.requestServedFromCache", func(target *gcd.ChromeTarget, payload []byte) {
@@ -325,7 +325,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		}
 		bodyStr, encoded, err := t.t.Network.GetResponseBody(message.Params.RequestId)
 		if err != nil {
-			log.Warn().Str("url", message.Params.Response.Url).Err(err).Msg("failed to get body")
+			log.Warn().Int64("browser_id", t.id).Str("url", message.Params.Response.Url).Err(err).Msg("failed to get body")
 		}
 
 		body := []byte(bodyStr)
@@ -334,7 +334,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		}
 
 		t.container.AddResponse(GCDResponseToBrowserk(message, body))
-		log.Debug().Int32("pending", t.container.OpenRequestCount()).Str("url", p.Response.Url).Str("request_id", message.Params.RequestId).Msg("added")
+		log.Debug().Int64("browser_id", t.id).Int32("pending", t.container.OpenRequestCount()).Str("url", p.Response.Url).Str("request_id", message.Params.RequestId).Msg("added")
 	})
 
 	t.t.Subscribe("Network.loadingFinished", func(target *gcd.ChromeTarget, payload []byte) {
@@ -352,7 +352,7 @@ func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 	t.t.Subscribe("Fetch.requestPaused", func(target *gcd.ChromeTarget, payload []byte) {
 		message := &gcdapi.FetchRequestPausedEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {
-			log.Fatal().Err(err).Msg("critical error Fetch.requestPaused event was unable to decode")
+			log.Fatal().Err(err).Int64("browser_id", t.id).Msg("critical error Fetch.requestPaused event was unable to decode")
 		}
 
 		if message.Params.ResponseHeaders == nil {
@@ -406,7 +406,7 @@ func (t *Tab) interceptedResponse(ctx *browserk.Context, message *gcdapi.FetchRe
 
 	bodyStr, encoded, err := t.t.Fetch.GetResponseBody(p.RequestId)
 	if err != nil {
-		log.Warn().Err(err).Str("request_id", p.RequestId).Msg("unable to get body")
+		log.Warn().Err(err).Int64("browser_id", t.id).Str("request_id", p.RequestId).Msg("unable to get body")
 		//spew.Dump(p)
 		t.t.Fetch.ContinueRequestWithParams(&gcdapi.FetchContinueRequestParams{
 			RequestId: p.RequestId,

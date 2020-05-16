@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
 )
@@ -130,9 +129,10 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, entry *browserk.Nav
 		for _, a := range aElements {
 			scope := resolveScopeRef(bctx, baseHref, a.Attributes["href"])
 			if scope == browserk.InScope {
+				log.Info().Str("href", a.Attributes["href"]).Msg("in scope, adding")
 				nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, a, browserk.ActLeftClick)
 				nav.Scope = scope
-				navs = append(navs)
+				navs = append(navs, nav)
 			} else {
 				log.Debug().Str("baseHref", baseHref).Str("linkHref", a.Attributes["href"]).Msg("was out of scope, not creating new nav")
 			}
@@ -140,7 +140,6 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, entry *browserk.Nav
 	}
 
 	// todo pull out additional clickable/whateverable elements
-	spew.Dump(navs)
 	return navs
 }
 

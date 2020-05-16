@@ -1,0 +1,5 @@
+URL = "http://localhost:8080/"
+AllowedHosts = ["localhost"]
+ExcludedURIs = ["/logout.php"]
+DataPath = "browserktmp"
+NumBrowsers = 3

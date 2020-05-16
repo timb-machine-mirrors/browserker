@@ -5,6 +5,7 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
@@ -86,6 +87,7 @@ func (b *Browserk) Init(ctx context.Context) error {
 }
 
 func (b *Browserk) initNavigation() {
+	log.Info().Msgf("ADDING URL %s", b.cfg.URL)
 	nav := browserk.NewNavigation(browserk.TrigInitial, &browserk.Action{
 		Type:   browserk.ActLoadURL,
 		Input:  []byte(b.cfg.URL),
@@ -100,6 +102,7 @@ func (b *Browserk) initNavigation() {
 	if !b.crawlGraph.NavExists(nav) {
 		b.crawlGraph.AddNavigation(nav)
 		log.Info().Msg("Load URL added to crawl graph")
+		spew.Dump(nav)
 	} else {
 		log.Info().Msg("Navigation for Load URL already exists")
 	}
@@ -144,7 +147,7 @@ func (b *Browserk) processEntries() {
 	for {
 		select {
 		case <-b.stateMonitor.C:
-			// TODO: check graph for inprocess values that never made it
+			// TODO: check graph for inprocess values that never made it and reset them to unvisited
 			log.Info().Msg("state monitor ping")
 		case <-b.mainContext.Ctx.Done():
 			log.Info().Msg("scan finished due to context complete")
@@ -189,7 +192,7 @@ func (b *Browserk) crawl(entries [][]*browserk.Navigation) error {
 			if err != nil {
 				log.Error().Err(err).Msg("failed to process action")
 			}
-
+			log.Info().Int("nav_count", len(newNavs)).Bool("is_final", isFinal).Msg("adding new navs")
 			if err := b.crawlGraph.AddNavigations(newNavs); err != nil {
 				log.Error().Err(err).Msg("failed to add new navigations")
 			}

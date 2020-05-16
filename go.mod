@@ -11,6 +11,7 @@ require (
 	github.com/dgryski/go-farm v0.0.0-20200201041132-a6ae2369ad13 // indirect
 	github.com/golang/protobuf v1.4.0 // indirect
 	github.com/kr/pretty v0.2.0 // indirect
+	github.com/pelletier/go-toml v1.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.18.0
 	github.com/stretchr/testify v1.5.1 // indirect

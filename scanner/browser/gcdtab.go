@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
@@ -21,13 +21,14 @@ import (
 
 // Tab is a chromium browser tab we use for instrumentation
 type Tab struct {
-	g                     *gcd.Gcd
-	t                     *gcd.ChromeTarget
-	ctx                   *browserk.Context
-	container             *Container
-	id                    int64
-	eleMutex              *sync.RWMutex          // locks our elements when added/removed.
-	elements              map[int]*Element       // our map of elements for this tab
+	g         *gcd.Gcd
+	t         *gcd.ChromeTarget
+	ctx       *browserk.Context
+	container *Container
+	id        int64
+	eleMutex  *sync.RWMutex    // locks our elements when added/removed.
+	elements  map[int]*Element // our map of elements for this tab
+
 	topNodeID             atomic.Value           // the nodeID of the current top level #document
 	topFrameID            atomic.Value           // the frameID of the current top level #document
 	baseHref              atomic.Value           // the base href for the current top document
@@ -48,10 +49,14 @@ type Tab struct {
 	lastNodeChangeTimeVal atomic.Value           // timestamp of when the last node change occurred atomic because multiple go routines will modify
 	domChangeHandler      DomChangeHandlerFunc   // allows the caller to be notified of DOM change events.
 	docWasUpdated         atomic.Value           // for tracking if an execution caused a new page load/transition
+
+	frameMutex *sync.RWMutex
+	frames     map[string]int // frames
 }
 
 // NewTab to use
 func NewTab(ctx *browserk.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Tab {
+	id := rand.Int63() // TODO: generate random or something
 	t := &Tab{
 		t:            tab,
 		ctx:          ctx,
@@ -60,10 +65,14 @@ func NewTab(ctx *browserk.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *
 		exitCh:       make(chan struct{}),
 		navigationCh: make(chan int),
 	}
-	t.id = 1 // TODO: generate random or something
+	t.id = id
 	t.g = gcdBrowser
 	t.eleMutex = &sync.RWMutex{}
 	t.elements = make(map[int]*Element)
+
+	t.frames = make(map[string]int)
+	t.frameMutex = &sync.RWMutex{}
+
 	t.nodeChange = make(chan *NodeChangeEvent)
 	t.navigationCh = make(chan int, 1)  // for signaling navigation complete
 	t.docUpdateCh = make(chan struct{}) // wait for documentUpdate to be called during navigation
@@ -331,7 +340,7 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 	}
 
 	stableTimer := time.After(5 * time.Second)
-
+	defer t.t.Page.GetResourceTree()
 	// wait for DOM & network stability
 	log.Info().Msg("waiting for nav stability complete")
 	for {
@@ -575,11 +584,10 @@ func (t *Tab) GetScriptSource(scriptID string) (string, error) {
 // Gets the top document and updates our list of elements it creates all new nodeIDs.
 func (t *Tab) getDocument() (*Element, error) {
 	log.Debug().Msgf("getDocument doc id was: %d", t.getTopNodeID())
-	doc, err := t.t.DOM.GetDocument(-1, false)
+	doc, err := t.t.DOM.GetDocument(-1, true)
 	if err != nil {
 		return nil, err
 	}
-
 	t.setTopNodeID(doc.NodeId)
 	log.Debug().Msgf("getDocument doc id is now: %d", t.getTopNodeID())
 	t.addNodes(doc, 0)
@@ -663,8 +671,34 @@ func (t *Tab) getDocumentElementByID(docNodeID int, attributeID string) (*Elemen
 }
 
 // GetElementsBySelector all elements that match a selector from the top level document
+// also searches sub frames
 func (t *Tab) GetElementsBySelector(selector string) ([]*Element, error) {
-	return t.GetDocumentElementsBySelector(t.getTopNodeID(), selector)
+	elements, err := t.GetDocumentElementsBySelector(t.getTopNodeID(), selector)
+	if err != nil {
+		return nil, err
+	}
+
+	// search frames too
+	frameNodeIDs := t.getFrameNodeIDs()
+	for _, id := range frameNodeIDs {
+		frameElements, err := t.GetDocumentElementsBySelector(id, selector)
+		if err != nil {
+			log.Warn().Msg("failed to search frame for elements")
+			continue
+		}
+		elements = append(elements, frameElements...)
+	}
+	return elements, err
+}
+
+func (t *Tab) getFrameNodeIDs() []int {
+	nodeIDs := make([]int, 0)
+	t.frameMutex.RLock()
+	for _, v := range t.frames {
+		nodeIDs = append(nodeIDs, v)
+	}
+	t.frameMutex.RUnlock()
+	return nodeIDs
 }
 
 // GetChildElements all elements of a child
@@ -718,11 +752,6 @@ func (t *Tab) GetDocumentElementsBySelector(docNodeID int, selector string) ([]*
 	nodeIDs, errQuery := t.t.DOM.QuerySelectorAll(docNode.ID, selector)
 	if errQuery != nil {
 		log.Info().Msgf("QuerySelectorAll Err: searching for %s %d", selector, docNodeID)
-		spew.Dump(errQuery)
-		doc, err := t.t.DOM.GetDocument(1, false)
-		if err == nil {
-			spew.Dump(doc)
-		}
 		return nil, errQuery
 	}
 
@@ -891,6 +920,10 @@ func (t *Tab) addNodes(node *gcdapi.DOMNode, depth int) {
 	}
 
 	if node.ContentDocument != nil {
+		t.frameMutex.Lock()
+		t.frames[node.FrameId] = node.ContentDocument.NodeId
+		t.frameMutex.Unlock()
+
 		t.addNodes(node.ContentDocument, depth+1)
 	}
 	t.lastNodeChangeTimeVal.Store(time.Now())
