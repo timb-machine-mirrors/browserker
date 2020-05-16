@@ -2,6 +2,7 @@ package scanner
 
 import (
 	"context"
+	"net/url"
 	"time"
 
 	"github.com/pkg/errors"
@@ -40,13 +41,17 @@ func (b *Browserk) SetReporter(reporter browserk.Reporter) *Browserk {
 
 // Init the browsers and stores
 func (b *Browserk) Init(ctx context.Context) error {
+	target, err := url.Parse(b.cfg.URL)
+	if err != nil {
+		return err
+	}
 	cancelCtx, cancelFn := context.WithCancel(ctx)
 
 	b.mainContext = &browserk.Context{
 		Ctx:         cancelCtx,
 		CtxComplete: cancelFn,
 		Auth:        auth.New(b.cfg),
-		Scope:       b.scopeService(),
+		Scope:       b.scopeService(target),
 		Reporter:    b.reporter,
 		Injector:    nil,
 		Crawl:       b.crawlGraph,
@@ -86,7 +91,7 @@ func (b *Browserk) initNavigation() {
 		Input:  []byte(b.cfg.URL),
 		Result: nil,
 	})
-	nav.Scope = browserk.In
+	nav.Scope = browserk.InScope
 	nav.Distance = 0
 
 	// reset any inprocess navigations to unvisited because it didn't exit cleanly
@@ -100,15 +105,23 @@ func (b *Browserk) initNavigation() {
 	}
 }
 
-func (b *Browserk) scopeService() browserk.ScopeService {
-	allowed := b.cfg.AllowedURLs
-	ignored := b.cfg.IgnoredURLs
-	excluded := b.cfg.ExcludedURLs
+func (b *Browserk) scopeService(target *url.URL) browserk.ScopeService {
+	allowed := b.cfg.AllowedHosts
+	ignored := b.cfg.IgnoredHosts
+	excluded := b.cfg.ExcludedHosts
 
 	if allowed == nil {
-		allowed = []string{b.cfg.URL}
+		allowed = []string{target.Hostname()}
 	}
-	return NewScopeService(allowed, ignored, excluded)
+
+	scope := NewScopeService(target)
+	scope.AddScope(allowed, browserk.InScope)
+	scope.AddScope(ignored, browserk.OutOfScope)
+	scope.AddScope(excluded, browserk.ExcludedFromScope)
+	if b.cfg.ExcludedURIs != nil {
+		scope.AddExcludedURIs(b.cfg.ExcludedURIs)
+	}
+	return scope
 }
 
 // Start the browsers

@@ -2,6 +2,7 @@ package crawler
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
@@ -25,7 +26,7 @@ func (b *BrowserkCrawler) Init() error {
 }
 
 // Process the next navigation entry
-func (b *BrowserkCrawler) Process(ctx *browserk.Context, browser browserk.Browser, entry *browserk.Navigation, isFinal bool) (*browserk.NavigationResult, []*browserk.Navigation, error) {
+func (b *BrowserkCrawler) Process(bctx *browserk.Context, browser browserk.Browser, entry *browserk.Navigation, isFinal bool) (*browserk.NavigationResult, []*browserk.Navigation, error) {
 	errors := make([]error, 0)
 	startURL, err := browser.GetURL()
 	if err != nil {
@@ -46,7 +47,7 @@ func (b *BrowserkCrawler) Process(ctx *browserk.Context, browser browserk.Browse
 	}
 
 	// execute the action
-	navCtx, cancel := context.WithTimeout(ctx.Ctx, time.Second*15)
+	navCtx, cancel := context.WithTimeout(bctx.Ctx, time.Second*15)
 	defer cancel()
 	beforeAction := time.Now()
 	_, result.CausedLoad, err = browser.ExecuteAction(navCtx, entry.Action)
@@ -61,7 +62,7 @@ func (b *BrowserkCrawler) Process(ctx *browserk.Context, browser browserk.Browse
 	// find new potential navigation entries (if isFinal)
 	potentialNavs := make([]*browserk.Navigation, 0)
 	if isFinal {
-		potentialNavs = b.FindNewNav(entry, browser)
+		potentialNavs = b.FindNewNav(bctx, entry, browser)
 	}
 	return result, potentialNavs, nil
 }
@@ -87,8 +88,10 @@ func (b *BrowserkCrawler) buildResult(result *browserk.NavigationResult, start t
 }
 
 // FindNewNav potentials TODO: get navigation entry metadata (is vuejs/react etc) to be more specific
-func (b *BrowserkCrawler) FindNewNav(entry *browserk.Navigation, browser browserk.Browser) []*browserk.Navigation {
+func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, entry *browserk.Navigation, browser browserk.Browser) []*browserk.Navigation {
 	navs := make([]*browserk.Navigation, 0)
+	baseHref := browser.GetBaseHref()
+
 	// Pull out forms (highest priority)
 	formElements, err := browser.FindForms()
 	if err != nil {
@@ -96,7 +99,15 @@ func (b *BrowserkCrawler) FindNewNav(entry *browserk.Navigation, browser browser
 	} else if formElements != nil && len(formElements) > 0 {
 		log.Debug().Int("form_count", len(formElements)).Msg("found new forms")
 		for _, form := range formElements {
-			navs = append(navs, browserk.NewNavigationFromForm(entry, browserk.TrigCrawler, form))
+
+			scope := resolveScopeRef(bctx, baseHref, form.Attributes["action"])
+			if scope == browserk.InScope {
+				nav := browserk.NewNavigationFromForm(entry, browserk.TrigCrawler, form)
+				nav.Scope = scope
+				navs = append(navs, nav)
+			} else {
+				log.Debug().Str("href", baseHref).Str("action", form.Attributes["action"]).Msg("was out of scope, not creating new nav")
+			}
 		}
 	}
 
@@ -104,7 +115,7 @@ func (b *BrowserkCrawler) FindNewNav(entry *browserk.Navigation, browser browser
 	if err != nil {
 		log.Info().Err(err).Msg("error while extracting buttons")
 	} else if bElements != nil && len(bElements) > 0 {
-		log.Debug().Int("link_count", len(bElements)).Msg("found buttons")
+		log.Debug().Int("button_count", len(bElements)).Msg("found buttons")
 		for _, b := range bElements {
 			navs = append(navs, browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, b, browserk.ActLeftClick))
 		}
@@ -117,11 +128,36 @@ func (b *BrowserkCrawler) FindNewNav(entry *browserk.Navigation, browser browser
 	} else if aElements != nil && len(aElements) > 0 {
 		log.Debug().Int("link_count", len(aElements)).Msg("found links")
 		for _, a := range aElements {
-			navs = append(navs, browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, a, browserk.ActLeftClick))
+			scope := resolveScopeRef(bctx, baseHref, a.Attributes["href"])
+			if scope == browserk.InScope {
+				nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, a, browserk.ActLeftClick)
+				nav.Scope = scope
+				navs = append(navs)
+			} else {
+				log.Debug().Str("baseHref", baseHref).Str("linkHref", a.Attributes["href"]).Msg("was out of scope, not creating new nav")
+			}
 		}
 	}
 
 	// todo pull out additional clickable/whateverable elements
 	spew.Dump(navs)
 	return navs
+}
+
+// resolveScopeRef checks if the baseHref + potential link is in scope
+func resolveScopeRef(bctx *browserk.Context, baseHref, candidate string) browserk.Scope {
+	var scope browserk.Scope
+
+	if strings.HasPrefix(candidate, "http") {
+		scope = bctx.Scope.Check(candidate)
+	} else {
+		if baseHref != "" && strings.HasPrefix(baseHref, "http") {
+			if !strings.HasSuffix(baseHref, "/") {
+				baseHref += "/"
+			}
+		}
+		scope = bctx.Scope.Check(baseHref + candidate)
+	}
+
+	return scope
 }

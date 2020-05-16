@@ -132,3 +132,29 @@ func TestGcdWindows(t *testing.T) {
 	msgs, _ := b.GetMessages()
 	spew.Dump(msgs)
 }
+
+func TestBaseHref(t *testing.T) {
+	pool := browser.NewGCDBrowserPool(1, leaser)
+	if err := pool.Init(); err != nil {
+		t.Fatalf("failed to init pool")
+	}
+	defer leaser.Cleanup()
+	ctx := context.Background()
+	bCtx := mock.Context(ctx)
+	p, srv := testServer()
+	defer srv.Shutdown(ctx)
+
+	url := fmt.Sprintf("http://localhost:%s/basehref.html", p)
+
+	b, _, err := pool.Take(bCtx)
+	if err != nil {
+		t.Fatalf("error taking browser: %s\n", err)
+	}
+
+	err = b.Navigate(ctx, url)
+	if err != nil {
+		t.Fatalf("error getting url %s\n", err)
+	}
+	eles, _ := b.FindElements("base")
+	spew.Dump(eles)
+}

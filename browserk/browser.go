@@ -22,6 +22,7 @@ type Browser interface {
 	GetURL() (string, error)
 	GetDOM() (string, error)
 	GetCookies() ([]*Cookie, error)
+	GetBaseHref() string
 	GetStorageEvents() []*StorageEvent
 	GetConsoleEvents() []*ConsoleEvent
 	Navigate(ctx context.Context, url string) (err error)

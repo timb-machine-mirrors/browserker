@@ -56,7 +56,7 @@ func NewNavigation(triggeredBy TriggeredBy, action *Action) *Navigation {
 		TriggeredBy:      triggeredBy,
 		State:            NavUnvisited,
 		StateUpdatedTime: time.Now(),
-		Scope:            In,
+		Scope:            InScope,
 	}
 
 	// TODO: add originID as part of new nav id for uniqueness?
@@ -85,7 +85,7 @@ func NewNavigationFromForm(from *Navigation, triggeredBy TriggeredBy, form *HTML
 		TriggeredBy:      triggeredBy,
 		State:            NavUnvisited,
 		StateUpdatedTime: time.Now(),
-		Scope:            In,
+		Scope:            InScope,
 		Distance:         from.Distance + 1,
 	}
 
@@ -113,7 +113,7 @@ func NewNavigationFromElement(from *Navigation, triggeredBy TriggeredBy, ele *HT
 		TriggeredBy:      triggeredBy,
 		State:            NavUnvisited,
 		StateUpdatedTime: time.Now(),
-		Scope:            In,
+		Scope:            InScope,
 		Distance:         from.Distance + 1,
 	}
 

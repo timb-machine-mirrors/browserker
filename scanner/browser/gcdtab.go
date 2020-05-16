@@ -30,6 +30,7 @@ type Tab struct {
 	elements              map[int]*Element       // our map of elements for this tab
 	topNodeID             atomic.Value           // the nodeID of the current top level #document
 	topFrameID            atomic.Value           // the frameID of the current top level #document
+	baseHref              atomic.Value           // the base href for the current top document
 	isNavigatingFlag      atomic.Value           // are we currently navigating (between Page.Navigate -> page.loadEventFired)
 	isTransitioningFlag   atomic.Value           // has navigation occurred on the top frame (not due to Navigate() being called)
 	debug                 bool                   // for debug printing
@@ -228,11 +229,18 @@ func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error
 	if err != nil {
 		return nil, err
 	}
+
 	bElements := make([]*browserk.HTMLElement, 0)
 	for _, ele := range elements {
 		bElements = append(bElements, ElementToHTMLElement(ele))
 	}
 	return bElements, nil
+}
+
+// GetBaseHref of the top level document
+// TODO will need to handle iframes here too
+func (t *Tab) GetBaseHref() string {
+	return t.baseHref.Load().(string)
 }
 
 // FindForms finds forms and pulls out all child elements.
@@ -374,6 +382,7 @@ func (t *Tab) SetStabilityTime(stableAfter time.Duration) {
 
 func (t *Tab) setIsNavigating(set bool) {
 	t.isNavigatingFlag.Store(set)
+	t.baseHref.Store("")
 }
 
 // IsNavigating answers if we currently navigating
@@ -386,6 +395,7 @@ func (t *Tab) IsNavigating() bool {
 
 func (t *Tab) setIsTransitioning(set bool) {
 	t.isTransitioningFlag.Store(set)
+	t.baseHref.Store("")
 }
 
 // IsTransitioning returns true if we are transitioning to a new page. This is not set when Navigate is called.
@@ -865,14 +875,21 @@ func (t *Tab) addNodes(node *gcdapi.DOMNode, depth int) {
 	t.eleMutex.Lock()
 	t.elements[newEle.ID] = newEle
 	t.eleMutex.Unlock()
-	//log.Printf("Added new element: %s\n", newEle)
-	//t.requestChildNodes(newEle.ID, 1)
+
 	if node.Children != nil {
 		// add child nodes
 		for _, v := range node.Children {
 			t.addNodes(v, depth+1)
 		}
 	}
+
+	// base href can cause relative links to go out of scope
+	// so we need to capture it
+	tag, _ := newEle.GetTagName()
+	if tag == "BASE" && newEle.HasAttribute("href") {
+		t.baseHref.Store(newEle.GetAttribute("href"))
+	}
+
 	if node.ContentDocument != nil {
 		t.addNodes(node.ContentDocument, depth+1)
 	}

@@ -35,12 +35,12 @@ func CrawlerFlags() []cli.Flag {
 
 func Crawler(ctx *cli.Context) error {
 	cfg := &browserk.Config{
-		URL:          ctx.String("url"),
-		AllowedURLs:  nil,
-		ExcludedURLs: nil,
-		DataPath:     "",
-		AuthScript:   "",
-		AuthType:     0,
+		URL:           ctx.String("url"),
+		AllowedHosts:  nil,
+		ExcludedHosts: nil,
+		DataPath:      "",
+		AuthScript:    "",
+		AuthType:      0,
 		Credentials: &browserk.Credentials{
 			Username: "",
 			Password: "",

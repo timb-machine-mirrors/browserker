@@ -4,15 +4,19 @@ package browserk
 type Scope int8
 
 const (
-	// In scope (we attack)
-	In Scope = iota + 1
-	// Out of scope (we do not attack, but access)
-	Out
-	// Excluded from scope (we do not access or attack)
-	Excluded
+	// InScope (we attack)
+	InScope Scope = iota + 1
+	// OutOfScope (we do not attack, but access)
+	OutOfScope
+	// ExcludedFromScope (we do not access or attack)
+	ExcludedFromScope
 )
 
 // ScopeService checks if a url is in scope
 type ScopeService interface {
-	Check(url string) Scope
+	AddScope(inputs []string, scope Scope)
+	AddExcludedURIs(inputs []string)
+	ExcludeForms(idsOrNames []string)
+	Check(uri string) Scope
+	CheckRelative(base, relative string) Scope
 }
