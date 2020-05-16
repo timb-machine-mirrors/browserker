@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
 )
@@ -92,10 +93,20 @@ func (b *BrowserkCrawler) FindNewNav(entry *browserk.Navigation, browser browser
 	formElements, err := browser.FindForms()
 	if err != nil {
 		log.Info().Err(err).Msg("error while extracting forms")
-	} else if formElements != nil {
+	} else if formElements != nil && len(formElements) > 0 {
 		log.Debug().Int("form_count", len(formElements)).Msg("found new forms")
 		for _, form := range formElements {
 			navs = append(navs, browserk.NewNavigationFromForm(entry, browserk.TrigCrawler, form))
+		}
+	}
+
+	bElements, err := browser.FindElements("button")
+	if err != nil {
+		log.Info().Err(err).Msg("error while extracting buttons")
+	} else if bElements != nil && len(bElements) > 0 {
+		log.Debug().Int("link_count", len(bElements)).Msg("found buttons")
+		for _, b := range bElements {
+			navs = append(navs, browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, b, browserk.ActLeftClick))
 		}
 	}
 
@@ -103,13 +114,14 @@ func (b *BrowserkCrawler) FindNewNav(entry *browserk.Navigation, browser browser
 	aElements, err := browser.FindElements("a")
 	if err != nil {
 		log.Info().Err(err).Msg("error while extracting links")
-	} else if aElements != nil {
-		log.Debug().Int("link_count", len(aElements)).Msg("found new forms")
+	} else if aElements != nil && len(aElements) > 0 {
+		log.Debug().Int("link_count", len(aElements)).Msg("found links")
 		for _, a := range aElements {
 			navs = append(navs, browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, a, browserk.ActLeftClick))
 		}
 	}
 
 	// todo pull out additional clickable/whateverable elements
+	spew.Dump(navs)
 	return navs
 }

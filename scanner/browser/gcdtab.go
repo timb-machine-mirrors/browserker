@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -100,6 +101,7 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 	// Call JSBefore hooks
 	t.ctx.NextJSBefore(t)
 
+	t.handleDocumentUpdated()
 	// reset doc was updated flag
 	t.docWasUpdated.Store(false)
 	// do action
@@ -115,12 +117,19 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 		}
 		err = ele.Click()
 		// add small delay after click
-		t := time.NewTimer(time.Millisecond * 200)
-		defer t.Stop()
+		timer := time.NewTimer(time.Millisecond * 200)
+		defer timer.Stop()
+
 		select {
-		case <-t.C:
+		case <-timer.C:
 		case <-ctx.Done():
 		}
+
+		if t.IsTransitioning() {
+			log.Info().Msg("CLICK CAUSED TRANSITION EVENT!")
+			t.waitReady(ctx, t.stabilityTimeout)
+		}
+
 	case browserk.ActLeftClickDown:
 	case browserk.ActLeftClickUp:
 	case browserk.ActRightClick:
@@ -155,10 +164,11 @@ func (t *Tab) Navigate(ctx context.Context, url string) error {
 	defer t.setIsNavigating(false)
 	log.Debug().Msgf("navigating to %s", url)
 	navParams := &gcdapi.PageNavigateParams{Url: url, TransitionType: "typed"}
-	_, _, errText, err := t.t.Page.NavigateWithParams(navParams)
+	frameID, _, errText, err := t.t.Page.NavigateWithParams(navParams)
 	if err != nil {
 		return err
 	}
+	t.setTopFrameID(frameID)
 
 	if errText != "" {
 		return errors.Wrap(ErrNavigating, errText)
@@ -191,7 +201,7 @@ func (t *Tab) FindByHTMLElement(ele *browserk.HTMLElement) (*Element, error) {
 	if ele == nil {
 		return nil, &ErrInvalidElement{}
 	}
-	tag := browserk.HTMLTypeToStrMap[ele.Type]
+	tag := strings.ToLower(browserk.HTMLTypeToStrMap[ele.Type])
 	if ele.Type == browserk.CUSTOM {
 		tag = ele.CustomTagName
 	}
@@ -552,18 +562,16 @@ func (t *Tab) GetScriptSource(scriptID string) (string, error) {
 	return scriptSrc, err
 }
 
-// Gets the top document and updates our list of elements DO NOT CALL DOM.GetDocument after
-// the page has loaded, it creates new nodeIDs and all functions that look up elements (QuerySelector)
-// will fail.
+// Gets the top document and updates our list of elements it creates all new nodeIDs.
 func (t *Tab) getDocument() (*Element, error) {
+	log.Debug().Msgf("getDocument doc id was: %d", t.getTopNodeID())
 	doc, err := t.t.DOM.GetDocument(-1, false)
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Msg("getDocument called")
-	t.setTopNodeID(doc.NodeId)
-	t.setTopFrameID(doc.FrameId)
 
+	t.setTopNodeID(doc.NodeId)
+	log.Debug().Msgf("getDocument doc id is now: %d", t.getTopNodeID())
 	t.addNodes(doc, 0)
 	eleDoc, _ := t.getElement(doc.NodeId)
 	return eleDoc, nil
@@ -699,7 +707,8 @@ func (t *Tab) GetDocumentElementsBySelector(docNodeID int, selector string) ([]*
 
 	nodeIDs, errQuery := t.t.DOM.QuerySelectorAll(docNode.ID, selector)
 	if errQuery != nil {
-		log.Info().Msgf("QuerySelectorAll Err: %#v", errQuery)
+		log.Info().Msgf("QuerySelectorAll Err: searching for %s %d", selector, docNodeID)
+		spew.Dump(errQuery)
 		doc, err := t.t.DOM.GetDocument(1, false)
 		if err == nil {
 			spew.Dump(doc)

@@ -54,12 +54,14 @@ func (t *Tab) subscribeLoadEvent() {
 
 func (t *Tab) subscribeFrameLoadingEvent() {
 	t.t.Subscribe("Page.frameStartedLoading", func(target *gcd.ChromeTarget, payload []byte) {
+		log.Info().Msg("frame loading")
 		if t.IsNavigating() {
 			return
 		}
 		header := &gcdapi.PageFrameStartedLoadingEvent{}
 		err := json.Unmarshal(payload, header)
 		// has the top frame id begun navigating?
+		log.Info().Msgf("transitioning! %s vs top frame: %s", header.Params.FrameId, t.getTopFrameID())
 		if err == nil && header.Params.FrameId == t.getTopFrameID() {
 			t.setIsTransitioning(true)
 		}
