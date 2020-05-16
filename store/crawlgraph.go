@@ -6,7 +6,6 @@ import (
 	"os"
 	"reflect"
 
-	"github.com/davecgh/go-spew/spew"
 	badger "github.com/dgraph-io/badger/v2"
 	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
@@ -119,33 +118,6 @@ func (g *CrawlGraph) AddNavigations(navs []*browserk.Navigation) error {
 	})
 }
 
-// AddResult of a navigation
-func (g *CrawlGraph) AddResult(result *browserk.NavigationResult) error {
-	return g.GraphStore.Update(func(txn *badger.Txn) error {
-		for i := 0; i < len(g.navResultPredicates); i++ {
-			key := MakeKey(result.ID, g.navResultPredicates[i].name)
-			rv := reflect.ValueOf(*result)
-			bytez, err := Encode(rv, g.navResultPredicates[i].index)
-
-			if g.navResultPredicates[i].name == "r_nav_id" {
-				navKey := MakeKey(result.NavigationID, g.navResultPredicates[i].name)
-				txn.Set(navKey, bytez) // store this separately so we can it look it up
-				log.Info().Msg("SPECIAL CASE")
-				spew.Dump(navKey)
-				spew.Dump(bytez)
-			}
-
-			if err != nil {
-				log.Error().Err(err).Msg("failed to encode nav result")
-				return err
-			}
-			// key = <id>:<predicate>, value = msgpack'd bytes
-			txn.Set(key, bytez)
-		}
-		return nil
-	})
-}
-
 // NavExists check
 func (g *CrawlGraph) NavExists(nav *browserk.Navigation) bool {
 	var exist bool
@@ -184,17 +156,46 @@ func (g *CrawlGraph) GetNavigation(id []byte) (*browserk.Navigation, error) {
 	return exist, err
 }
 
+// AddResult of a navigation. Iterate over all predicates and encode/store
+// For the original navigation ID we want to store:
+// r_nav_id:<nav id> = result.ID so we can GetNavigationResult(nav_id) to get
+// the node ID for this result then look up <predicate>:resultID = ... values ...
+func (g *CrawlGraph) AddResult(result *browserk.NavigationResult) error {
+
+	return g.GraphStore.Update(func(txn *badger.Txn) error {
+		for i := 0; i < len(g.navResultPredicates); i++ {
+			key := MakeKey(result.ID, g.navResultPredicates[i].name)
+			rv := reflect.ValueOf(*result)
+			bytez, err := Encode(rv, g.navResultPredicates[i].index)
+
+			if g.navResultPredicates[i].name == "r_nav_id" {
+				navKey := MakeKey(result.NavigationID, g.navResultPredicates[i].name)
+				enc, _ := EncodeBytes(result.ID)
+				// store this separately so we can it look it up (values are always encoded)
+				txn.Set(navKey, enc)
+			}
+
+			if err != nil {
+				log.Error().Err(err).Msg("failed to encode nav result")
+				return err
+			}
+			// key = <id>:<predicate>, value = msgpack'd bytes
+			txn.Set(key, bytez)
+		}
+		return nil
+	})
+}
+
+// GetNavigationResult from the navigation id
 func (g *CrawlGraph) GetNavigationResult(navID []byte) (*browserk.NavigationResult, error) {
 	exist := &browserk.NavigationResult{}
 	err := g.GraphStore.View(func(txn *badger.Txn) error {
 		var err error
 
-		bNavID, _ := EncodeBytes(navID)
-		key := MakeKey(bNavID, "r_nav_id")
+		key := MakeKey(navID, "r_nav_id")
 		item, err := txn.Get(key)
 		if err == badger.ErrKeyNotFound {
 			log.Error().Err(err).Msg("failed to find result navID")
-			spew.Dump(key)
 			return nil
 		}
 		retVal, err := item.ValueCopy(nil)
@@ -202,7 +203,8 @@ func (g *CrawlGraph) GetNavigationResult(navID []byte) (*browserk.NavigationResu
 			return err
 		}
 
-		exist, err = DecodeNavigationResult(txn, g.navResultPredicates, retVal)
+		resultID, _ := DecodeID(retVal)
+		exist, err = DecodeNavigationResult(txn, g.navResultPredicates, resultID)
 		return err
 	})
 	return exist, err

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	badger "github.com/dgraph-io/badger/v2"
+	"github.com/rs/zerolog/log"
 	"github.com/vmihailenco/msgpack/v4"
 	"gitlab.com/browserker/browserk"
 )
@@ -83,19 +84,20 @@ func DecodeNavigation(txn *badger.Txn, predicates []*NavGraphField, nodeID []byt
 	return nav, nil
 }
 
-// DecodeNavigationResult takes a transaction and a nodeID and returns a navigation object or err
-func DecodeNavigationResult(txn *badger.Txn, predicates []*NavGraphField, nodeID []byte) (*browserk.NavigationResult, error) {
+// DecodeNavigationResult takes a transaction and a result nodeID and returns a navigation object or err
+func DecodeNavigationResult(txn *badger.Txn, predicates []*NavGraphField, resultNodeID []byte) (*browserk.NavigationResult, error) {
 	nav := &browserk.NavigationResult{}
 
 	fields := make([]PredicateField, len(predicates))
 	for i := 0; i < len(predicates); i++ {
 		name := predicates[i].name
-		key := MakeKey(nodeID, name)
+		key := MakeKey(resultNodeID, name)
 		p := PredicateField{key: key, name: name}
 		fields[i] = p
 	}
 
 	for _, pred := range fields {
+		log.Info().Msgf("looking up: %s", string(pred.key))
 		item, err := txn.Get(pred.key)
 		if err != nil {
 			return nil, err

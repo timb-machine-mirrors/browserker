@@ -125,7 +125,7 @@ func MakeMockCookies() []*browserk.Cookie {
 			Session:      true,
 			SameSite:     "",
 			Priority:     "",
-			ObservedTime: time.Time{},
+			ObservedTime: time.Now(),
 		})
 	}
 	return c
