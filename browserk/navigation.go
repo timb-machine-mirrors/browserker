@@ -2,6 +2,7 @@ package browserk
 
 import (
 	"crypto/md5"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -39,7 +40,7 @@ const (
 
 // Navigation for storing the action and results of navigating
 type Navigation struct {
-	ID               []byte      `graph:"id"`            // cayley does not support []byte keys :|
+	ID               []byte      `graph:"id"`            // unique id of this navigation depending on type
 	OriginID         []byte      `graph:"origin"`        // where this navigation node originated from
 	TriggeredBy      TriggeredBy `graph:"trig_by"`       // update to plugin/crawler/manual whatever type
 	State            NavState    `graph:"state"`         // state of this navigation
@@ -96,7 +97,7 @@ func NewNavigationFromForm(from *Navigation, triggeredBy TriggeredBy, form *HTML
 	return n
 }
 
-// NewNavigationFromElement creates a new navigation entry from clickable elements
+// NewNavigationFromElement creates a new navigation entry from eventable elements
 func NewNavigationFromElement(from *Navigation, triggeredBy TriggeredBy, ele *HTMLElement, aType ActionType) *Navigation {
 
 	action := &Action{
@@ -118,7 +119,13 @@ func NewNavigationFromElement(from *Navigation, triggeredBy TriggeredBy, ele *HT
 	}
 
 	h := md5.New()
-	h.Write(n.OriginID)
+	// we only want uniqueness of origin id's for links that would be unique on a page
+	// we don't want to keep going to /page if it exists on *every* page.
+	if link, ok := ele.Attributes["href"]; ok && ele.Type == A {
+		if strings.HasPrefix(link, "#") {
+			h.Write(n.OriginID)
+		}
+	}
 	h.Write(n.Action.Element.Hash())
 	n.ID = h.Sum(nil)
 	return n

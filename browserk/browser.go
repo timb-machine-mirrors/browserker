@@ -30,5 +30,7 @@ type Browser interface {
 	FindForms() ([]*HTMLFormElement, error)
 	GetMessages() ([]*HTTPMessage, error)
 	Screenshot(ctx context.Context) (string, error)
+	RefreshDocument()                                                     // reloads the document/elements
 	ExecuteAction(ctx context.Context, act *Action) ([]byte, bool, error) // result, caused page load, err
+	Close()
 }

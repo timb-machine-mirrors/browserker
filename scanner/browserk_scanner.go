@@ -201,6 +201,7 @@ func (b *Browserk) crawl(entries [][]*browserk.Navigation) error {
 				log.Error().Err(err).Msg("failed to add result")
 			}
 		}
+		browser.Close()
 		b.browsers.Return(navCtx.Ctx, port)
 	}
 	return nil

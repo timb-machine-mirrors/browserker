@@ -111,7 +111,6 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 	// Call JSBefore hooks
 	t.ctx.NextJSBefore(t)
 
-	t.handleDocumentUpdated()
 	// reset doc was updated flag
 	t.docWasUpdated.Store(false)
 	// do action
@@ -157,10 +156,12 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 	case browserk.ActWait:
 	}
 	// Call JSAfter hooks
+
 	t.ctx.NextJSAfter(t)
 	if docUpdated, ok := t.docWasUpdated.Load().(bool); ok {
 		causedLoad = docUpdated
 	}
+
 	return nil, causedLoad, err
 }
 
@@ -233,7 +234,6 @@ func (t *Tab) FindByHTMLElement(ele *browserk.HTMLElement) (*Element, error) {
 
 // FindElements elements via querySelector, does not pull out children
 func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error) {
-	t.handleDocumentUpdated() // refresh Document
 	elements, err := t.GetElementsBySelector(querySelector)
 	if err != nil {
 		return nil, err
@@ -255,7 +255,6 @@ func (t *Tab) GetBaseHref() string {
 // FindForms finds forms and pulls out all child elements.
 // we may need more than just input fields (labels) etc for context
 func (t *Tab) FindForms() ([]*browserk.HTMLFormElement, error) {
-	t.handleDocumentUpdated() // refresh Document
 	elements, err := t.GetElementsBySelector("form")
 	if err != nil {
 		return nil, err
@@ -675,7 +674,12 @@ func (t *Tab) getDocumentElementByID(docNodeID int, attributeID string) (*Elemen
 func (t *Tab) GetElementsBySelector(selector string) ([]*Element, error) {
 	elements, err := t.GetDocumentElementsBySelector(t.getTopNodeID(), selector)
 	if err != nil {
-		return nil, err
+		// try again but refresh the doc
+		t.RefreshDocument()
+		elements, err = t.GetDocumentElementsBySelector(t.getTopNodeID(), selector)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// search frames too
@@ -744,12 +748,7 @@ func (t *Tab) recursivelyGetChildren(children []*gcdapi.DOMNode, elements *[]*El
 
 // GetDocumentElementsBySelector same as GetChildElementsBySelector
 func (t *Tab) GetDocumentElementsBySelector(docNodeID int, selector string) ([]*Element, error) {
-	docNode, ok := t.getElement(docNodeID)
-	if !ok {
-		return nil, &ElementNotFoundErr{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
-	}
-
-	nodeIDs, errQuery := t.t.DOM.QuerySelectorAll(docNode.ID, selector)
+	nodeIDs, errQuery := t.t.DOM.QuerySelectorAll(docNodeID, selector)
 	if errQuery != nil {
 		log.Info().Msgf("QuerySelectorAll Err: searching for %s %d", selector, docNodeID)
 		return nil, errQuery
@@ -954,6 +953,10 @@ func (t *Tab) listenDebuggerEvents(ctx *browserk.Context) {
 			return
 		}
 	}
+}
+
+func (t *Tab) RefreshDocument() {
+	t.handleDocumentUpdated()
 }
 
 // Handles the document updated event. This occurs after a navigation or redirect.

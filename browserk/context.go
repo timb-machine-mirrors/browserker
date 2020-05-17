@@ -185,7 +185,7 @@ func (c *Context) NextJSAfter(browser Browser) {
 	}
 }
 
-// AddJSAfterHandler adds new request handlers
+// AddJSAfterHandler adds new js handlers
 func (c *Context) AddJSAfterHandler(i ...JSHandler) {
 	if c.jsAfterHandler == nil {
 		c.jsAfterHandler = make([]JSHandler, 0)

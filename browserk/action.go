@@ -30,6 +30,32 @@ const (
 	ActSubRequest
 )
 
+var ActionTypeMap = map[ActionType]string{
+	ActLoadURL:         "ActLoadURL",
+	ActExecuteJS:       "ActExecuteJS",
+	ActLeftClick:       "ActLeftClick",
+	ActLeftClickDown:   "ActLeftClickDown",
+	ActLeftClickUp:     "ActLeftClickUp",
+	ActRightClick:      "ActRightClick",
+	ActRightClickDown:  "ActRightClickDown",
+	ActRightClickUp:    "ActRightClickUp",
+	ActMiddleClick:     "ActMiddleClick",
+	ActMiddleClickDown: "ActMiddleClickDown",
+	ActMiddleClickUp:   "ActMiddleClickUp",
+	ActScroll:          "ActScroll",
+	ActSendKeys:        "ActSendKeys",
+	ActKeyUp:           "ActKeyUp",
+	ActKeyDown:         "ActKeyDown",
+	ActHover:           "ActHover",
+	ActFocus:           "ActFocus",
+	ActWait:            "ActWait",
+	ActFillForm:        "ActFillForm",
+
+	// ActionTypes that occured automatically
+	ActRedirect:   "ActRedirect",
+	ActSubRequest: "ActSubRequest",
+}
+
 // Action runs a browser action, may or may not create a result
 type Action struct {
 	browser Browser

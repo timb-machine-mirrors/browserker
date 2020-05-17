@@ -177,6 +177,8 @@ func (e *Element) WaitForReady() error {
 		return nil
 	case <-timeout.C:
 		return &ErrElementNotReady{}
+	case <-e.tab.exitCh:
+		return &ErrElementNotReady{}
 	}
 }
 

@@ -30,6 +30,13 @@ func main() {
 			Action:  clicmds.Crawler,
 			Flags:   clicmds.CrawlerFlags(),
 		},
+		{
+			Name:    "db",
+			Aliases: nil,
+			Usage:   "db viewer",
+			Action:  clicmds.DBView,
+			Flags:   clicmds.DBViewFlags(),
+		},
 	}
 	fmt.Println(os.Args)
 	err := app.Run(os.Args)

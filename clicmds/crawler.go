@@ -6,6 +6,10 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
+
+	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/pelletier/go-toml"
 	"github.com/rs/zerolog/log"
@@ -32,24 +36,26 @@ func CrawlerFlags() []cli.Flag {
 			Usage: "data directory",
 			Value: "browserktmp",
 		},
+		&cli.BoolFlag{
+			Name:  "profile",
+			Usage: "enable to profile cpu/mem",
+			Value: false,
+		},
 	}
 }
 
+// Crawler runs browserker crawler
 func Crawler(ctx *cli.Context) error {
+	if ctx.Bool("profile") {
+		go func() {
+			http.ListenAndServe(":6060", nil)
+		}()
+	}
+
 	cfg := &browserk.Config{}
 	if ctx.String("config") == "" {
 		cfg = &browserk.Config{
-			URL:           ctx.String("url"),
-			AllowedHosts:  nil,
-			ExcludedHosts: nil,
-			DataPath:      "",
-			AuthScript:    "",
-			AuthType:      0,
-			Credentials: &browserk.Credentials{
-				Username: "",
-				Password: "",
-				Email:    "",
-			},
+			URL:         ctx.String("url"),
 			NumBrowsers: 3,
 		}
 	} else {
@@ -84,6 +90,8 @@ func Crawler(ctx *cli.Context) error {
 		<-c
 		log.Info().Msg("Ctrl-C Pressed, shutting down")
 		err := browserk.Stop()
+		log.Info().Msg("Giving a few seconds to sync db...")
+		time.Sleep(time.Second * 10)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to stop browserk")
 		}
@@ -96,4 +104,8 @@ func Crawler(ctx *cli.Context) error {
 	}
 
 	return browserk.Stop()
+}
+
+func profile() {
+
 }

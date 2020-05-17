@@ -19,7 +19,6 @@ type NavGraphField struct {
 
 type CrawlGraph struct {
 	GraphStore          *badger.DB
-	RequestStore        *badger.DB
 	filepath            string
 	navPredicates       []*NavGraphField
 	navResultPredicates []*NavGraphField
@@ -34,16 +33,19 @@ func NewCrawlGraph(filepath string) *CrawlGraph {
 func (g *CrawlGraph) Init() error {
 	var err error
 
-	if err = os.MkdirAll(g.filepath+"/requests", 0677); err != nil {
+	if err = os.MkdirAll(g.filepath, 0677); err != nil {
 		return err
 	}
 
-	g.RequestStore, err = badger.Open(badger.DefaultOptions(g.filepath + "/requests"))
-	if err != nil {
-		return err
+	g.GraphStore, err = badger.Open(badger.DefaultOptions(g.filepath))
+
+	if errors.Is(err, badger.ErrTruncateNeeded) {
+		log.Warn().Msg("there was a failure re-opening database, trying to recover")
+		opts := badger.DefaultOptions(g.filepath)
+		opts.Truncate = true
+		g.GraphStore, err = badger.Open(opts)
 	}
 
-	g.GraphStore, err = badger.Open(badger.DefaultOptions(g.filepath + "/crawl"))
 	if err != nil {
 		return err
 	}
@@ -69,10 +71,17 @@ func (g *CrawlGraph) discoverPredicates(f interface{}) []*NavGraphField {
 	return predicates
 }
 
-// AddNavigation entry into our graph and requests into request store
+// AddNavigation entry into our graph and requests into request store if it's unique
 func (g *CrawlGraph) AddNavigation(nav *browserk.Navigation) error {
 
 	return g.GraphStore.Update(func(txn *badger.Txn) error {
+		existKey := MakeKey(nav.ID, "id")
+		_, err := txn.Get(existKey)
+		if err == nil {
+			log.Debug().Bytes("nav", nav.ID).Msg("not adding nav as it already exists")
+			return nil
+		}
+
 		for i := 0; i < len(g.navPredicates); i++ {
 			key := MakeKey(nav.ID, g.navPredicates[i].name)
 
@@ -98,8 +107,10 @@ func (g *CrawlGraph) AddNavigations(navs []*browserk.Navigation) error {
 	return g.GraphStore.Update(func(txn *badger.Txn) error {
 		for _, nav := range navs {
 
-			if err := g.AddNavigation(nav); err != nil {
-				log.Warn().Err(err).Msg("failed to add navigation")
+			existKey := MakeKey(nav.ID, "id")
+			_, err := txn.Get(existKey)
+			if err == nil {
+				log.Debug().Bytes("nav", nav.ID).Msg("not adding nav as it already exists")
 				return nil
 			}
 
@@ -211,6 +222,38 @@ func (g *CrawlGraph) GetNavigationResult(navID []byte) (*browserk.NavigationResu
 	return exist, err
 }
 
+// GetNavigationResults from the navigation id
+func (g *CrawlGraph) GetNavigationResults() ([]*browserk.NavigationResult, error) {
+	navs := make([]*browserk.NavigationResult, 0)
+	err := g.GraphStore.View(func(txn *badger.Txn) error {
+		var err error
+
+		it := txn.NewIterator(badger.IteratorOptions{Prefix: []byte("r_nav_id")})
+		defer it.Close()
+		log.Debug().Msg("got iterator")
+		for it.Rewind(); it.Valid(); it.Next() {
+			item := it.Item()
+			val, err := item.ValueCopy(nil)
+			if err != nil {
+				return err
+			}
+			log.Debug().Msg("got value")
+			resultID, _ := DecodeID(val)
+			if err != nil {
+				return err
+			}
+			nav, err := DecodeNavigationResult(txn, g.navResultPredicates, resultID)
+			if err != nil {
+				log.Warn().Err(err).Msg("failed to decode a navigation result")
+				continue
+			}
+			navs = append(navs, nav)
+		}
+		return err
+	})
+	return navs, err
+}
+
 // Find navigation entries by a state. iff byState == setState will we not update the
 // state (and time stamp) returns a slice of a slice of all navigations on how to get
 // to the final navigation state (TODO: Optimize with determining graph edges)
@@ -266,18 +309,7 @@ func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserk.NavSta
 	return entries
 }
 
-// Close the graph and request stores
+// Close the graph store
 func (g *CrawlGraph) Close() error {
-	err1 := g.RequestStore.Close()
-	err2 := g.GraphStore.Close()
-
-	if err2 != nil {
-		// print request store unable to close but just return the graph error
-		if err1 != nil {
-			log.Error().Err(err1).Msg("failed to close request store")
-		}
-		return err2
-	}
-
-	return err1
+	return g.GraphStore.Close()
 }

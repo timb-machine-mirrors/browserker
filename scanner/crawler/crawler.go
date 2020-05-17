@@ -89,6 +89,7 @@ func (b *BrowserkCrawler) buildResult(result *browserk.NavigationResult, start t
 // FindNewNav potentials TODO: get navigation entry metadata (is vuejs/react etc) to be more specific
 func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, entry *browserk.Navigation, browser browserk.Browser) []*browserk.Navigation {
 	navs := make([]*browserk.Navigation, 0)
+	browser.RefreshDocument()
 	baseHref := browser.GetBaseHref()
 
 	// Pull out forms (highest priority)

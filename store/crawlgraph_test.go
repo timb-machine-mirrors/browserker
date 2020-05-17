@@ -40,23 +40,34 @@ func TestCrawlOpenClose(t *testing.T) {
 		t.Fatalf("error init graph: %s\n", err)
 	}
 	defer g.Close()
-	nav := mock.MakeMockNavi([]byte{0, 1, 2})
-	nav.OriginID = []byte{}
-	if err := g.AddNavigation(nav); err != nil {
-		t.Fatalf("error adding: %s\n", err)
-	}
-	if !g.NavExists(nav) {
-		t.Fatalf("nav should have existed")
-	}
-	g.Close()
+	for i := 1; i < 6; i++ {
+		nav := mock.MakeMockNavi([]byte{0, byte(i), 2})
+		nav.OriginID = []byte{0, byte(i - 1), 2}
+		nav.Distance = i - 1
 
+		if i == 1 {
+			nav.OriginID = []byte{} // signals root
+		}
+
+		if err := g.AddNavigation(nav); err != nil {
+			t.Fatalf("error adding: %s\n", err)
+		}
+	}
+	testGetNavResults(t, g)
+	g.Close()
+	t.Log("REOPENING DB")
 	g = store.NewCrawlGraph("testdata/oc")
 	if err := g.Init(); err != nil {
 		t.Fatalf("error init graph: %s\n", err)
 	}
-	if !g.NavExists(nav) {
-		t.Fatalf("nav should have existed")
+	// reset from inprocess -> unvisited
+	limit := 5
+	entries := g.Find(nil, browserk.NavInProcess, browserk.NavUnvisited, int64(limit))
+	if len(entries) != limit {
+		t.Fatalf("entries did not match limit got %d\n", len(entries))
 	}
+
+	testGetNavResults(t, g)
 }
 
 func TestCrawlGraph(t *testing.T) {
