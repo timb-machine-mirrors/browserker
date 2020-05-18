@@ -11,16 +11,16 @@ import (
 )
 
 // ElementToHTMLElement convert
-func ElementToHTMLElement(ele *Element) *browserk.HTMLElement {
+func NodeToHTMLElement(node *gcdapi.DOMNode) *browserk.HTMLElement {
 	var ok bool
 	b := &browserk.HTMLElement{Events: make([]browserk.HTMLEventType, 0)}
 	b.Type = browserk.CUSTOM
 
-	tag, _ := ele.GetTagName()
-	b.Attributes, _ = ele.GetAttributes()
-	b.Depth = ele.Depth()
-	listeners, err := ele.GetEventListeners()
-	b.InnerText = ele.GetInnerText()
+	tag, _ := node.GetTagName()
+	b.Attributes, _ = node.GetAttributes()
+	b.Depth = node.Depth()
+	listeners, err := node.GetEventListeners()
+	b.InnerText = node.GetInnerText()
 	if err == nil {
 		for _, listener := range listeners {
 			eventType, ok := browserk.HTMLEventTypeMap[listener.Type]

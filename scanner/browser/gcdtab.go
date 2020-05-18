@@ -26,8 +26,8 @@ type Tab struct {
 	ctx       *browserk.Context
 	container *Container
 	id        int64
-	eleMutex  *sync.RWMutex    // locks our elements when added/removed.
-	elements  map[int]*Element // our map of elements for this tab
+	eleMutex  *sync.RWMutex           // locks our elements when added/removed.
+	elements  map[int]*gcdapi.DOMNode // our map of elements for this tab
 
 	topNodeID             atomic.Value           // the nodeID of the current top level #document
 	topFrameID            atomic.Value           // the frameID of the current top level #document
@@ -68,7 +68,7 @@ func NewTab(ctx *browserk.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *
 	t.id = id
 	t.g = gcdBrowser
 	t.eleMutex = &sync.RWMutex{}
-	t.elements = make(map[int]*Element)
+	t.elements = make(map[int]*gcdapi.DOMNode)
 
 	t.frames = make(map[string]int)
 	t.frameMutex = &sync.RWMutex{}
@@ -608,18 +608,18 @@ func (t *Tab) GetDocument() (*Element, error) {
 // invalid element to our list of known elements. But it is assumed this method will be called
 // with a valid nodeID that chrome has not informed us about yet. Once we are informed, we need
 // to update it via our list and not some reference that could disappear.
-func (t *Tab) getElementByNodeID(nodeID int) (*Element, bool) {
+func (t *Tab) getElementByNodeID(nodeID int) (*gcdapi.DOMNode, bool) {
 	t.eleMutex.RLock()
-	ele, ok := t.elements[nodeID]
+	node, ok := t.elements[nodeID]
 	t.eleMutex.RUnlock()
 	if ok {
-		return ele, true
+		return node, true
 	}
-	newEle := newElement(t, nodeID, 0)
+	node = &gcdapi.DOMNode{NodeId: nodeID}
 	t.eleMutex.Lock()
-	t.elements[nodeID] = newEle // add non-ready element to our list.
+	t.elements[nodeID] = node // add non-ready element to our list.
 	t.eleMutex.Unlock()
-	return newEle, false
+	return node, false
 }
 
 // GetElementByLocation returns the element given the x, y coordinates on the page, or returns error.
@@ -654,14 +654,9 @@ func (t *Tab) GetElementByID(attributeID string) (*Element, bool, error) {
 func (t *Tab) getDocumentElementByID(docNodeID int, attributeID string) (*Element, bool, error) {
 	var err error
 
-	docNode, ok := t.getElement(docNodeID)
-	if !ok {
-		return nil, false, &ElementNotFoundErr{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
-	}
-
 	selector := "#" + attributeID
 
-	nodeID, err := t.t.DOM.QuerySelector(docNode.ID, selector)
+	nodeID, err := t.t.DOM.QuerySelector(docNodeID, selector)
 	if err != nil {
 		return nil, false, err
 	}
@@ -831,7 +826,7 @@ func (t *Tab) GetDocumentCurrentURL(docNodeID int) (string, error) {
 	if !ok {
 		return "", &ElementNotFoundErr{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
 	}
-	return docNode.node.DocumentURL, nil
+	return docNode.DocumentURL, nil
 }
 
 // Screenshot returns a png image, base64 encoded, or error if failed
@@ -874,19 +869,8 @@ func (t *Tab) requestChildNodes(nodeID, depth int) {
 	}
 }
 
-// Called if the element is known about but not yet populated. If it is not
-// known, we create a new element. If it is known we populate it and return it.
-func (t *Tab) nodeToElement(node *gcdapi.DOMNode, depth int) *Element {
-	if ele, ok := t.getElement(node.NodeId); ok {
-		ele.populateElement(node, depth)
-		return ele
-	}
-	newEle := newReadyElement(t, node, depth)
-	return newEle
-}
-
 // safely returns the element by looking it up by nodeId from our internal map.
-func (t *Tab) getElement(nodeID int) (*Element, bool) {
+func (t *Tab) getNode(nodeID int) (*gcdapi.DOMNode, bool) {
 	t.eleMutex.RLock()
 	defer t.eleMutex.RUnlock()
 	ele, ok := t.elements[nodeID]
@@ -898,10 +882,8 @@ func (t *Tab) getElement(nodeID int) (*Element, bool) {
 // Calls requestchild nodes for each node so we can receive setChildNode
 // events for even more nodes
 func (t *Tab) addNodes(node *gcdapi.DOMNode, depth int) {
-	newEle := t.nodeToElement(node, depth)
-
 	t.eleMutex.Lock()
-	t.elements[newEle.ID] = newEle
+	t.elements[node.NodeId] = node
 	t.eleMutex.Unlock()
 
 	if node.Children != nil {
@@ -913,9 +895,9 @@ func (t *Tab) addNodes(node *gcdapi.DOMNode, depth int) {
 
 	// base href can cause relative links to go out of scope
 	// so we need to capture it
-	tag, _ := newEle.GetTagName()
-	if tag == "BASE" && newEle.HasAttribute("href") {
-		t.baseHref.Store(newEle.GetAttribute("href"))
+	tag := node.NodeName
+	if tag == "BASE" && NodeHasAttribute(node, "href") {
+		t.baseHref.Store(NodeGetAttribute(node, "href"))
 	}
 
 	if node.ContentDocument != nil {
@@ -968,10 +950,7 @@ func (t *Tab) RefreshDocument() {
 func (t *Tab) handleDocumentUpdated() {
 	// set all elements as invalid and destroy the Elements map.
 	t.eleMutex.Lock()
-	for _, ele := range t.elements {
-		ele.setInvalidated(true)
-	}
-	t.elements = make(map[int]*Element)
+	t.elements = make(map[int]*gcdapi.DOMNode)
 	t.eleMutex.Unlock()
 
 	t.documentUpdated()
@@ -994,31 +973,38 @@ func (t *Tab) handleNodeChange(change *NodeChangeEvent) {
 	case SetChildNodesEvent:
 		t.handleSetChildNodes(change.ParentNodeID, change.Nodes)
 	case AttributeModifiedEvent:
-		if ele, ok := t.getElement(change.NodeID); ok {
-			if err := ele.WaitForReady(); err == nil {
-				ele.updateAttribute(change.Name, change.Value)
+		t.eleMutex.Lock()
+		if node, ok := t.elements[change.NodeID]; ok {
+			if NodeHasAttribute(node, change.Name) {
+				NodeUpdateAttribute(node, change.Name, change.Value)
 			}
 		}
+		t.eleMutex.Unlock()
 	case AttributeRemovedEvent:
-		if ele, ok := t.getElement(change.NodeID); ok {
-			if err := ele.WaitForReady(); err == nil {
-				ele.removeAttribute(change.Name)
+		t.eleMutex.Lock()
+		if node, ok := t.elements[change.NodeID]; ok {
+			if NodeHasAttribute(node, change.Name) {
+				NodeRemoveAttribute(node, change.Name, change.Value)
 			}
 		}
+		t.eleMutex.Unlock()
 	case CharacterDataModifiedEvent:
-		if ele, ok := t.getElement(change.NodeID); ok {
-			if err := ele.WaitForReady(); err == nil {
-				ele.updateCharacterData(change.CharacterData)
-			}
+		t.eleMutex.Lock()
+		if node, ok := t.elements[change.NodeID]; ok {
+			node.NodeValue = change.CharacterData
 		}
+		t.eleMutex.Unlock()
 	case ChildNodeCountUpdatedEvent:
-		if ele, ok := t.getElement(change.NodeID); ok {
-			if err := ele.WaitForReady(); err == nil {
-				ele.updateChildNodeCount(change.ChildNodeCount)
-			}
+		t.eleMutex.Lock()
+		if node, ok := t.elements[change.NodeID]; ok {
+			node.ChildNodeCount = change.ChildNodeCount
+			t.eleMutex.Unlock()
 			// request the child nodes
 			t.requestChildNodes(change.NodeID, 1)
+		} else {
+			t.eleMutex.Unlock()
 		}
+
 	case ChildNodeInsertedEvent:
 		t.handleChildNodeInserted(change.ParentNodeID, change.Node)
 	case ChildNodeRemovedEvent:
