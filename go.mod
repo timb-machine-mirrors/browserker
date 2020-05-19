@@ -17,8 +17,7 @@ require (
 	github.com/stretchr/testify v1.5.1 // indirect
 	github.com/urfave/cli/v2 v2.2.0
 	github.com/vmihailenco/msgpack/v4 v4.3.11
-	github.com/wirepair/gcd v1.0.9
+	github.com/wirepair/gcd v1.0.11-0.20200519122757-5220da3d5f2a
 	golang.org/x/net v0.0.0-20200425230154-ff2c4b7c35a0
 	golang.org/x/sys v0.0.0-20200428200454-593003d681fa // indirect
-	gopkg.in/yaml.v2 v2.2.8 // indirect
 )

@@ -31,7 +31,12 @@ func randPort() string {
 }
 
 func randProfile(tmp string) string {
+	os.MkdirAll(tmp, 0666)
 	profile, err := ioutil.TempDir(tmp, "gcd")
+	if err != nil {
+		log.Fatal().Err(err).Msg("profile returned empty which could delete system files on termination")
+	}
+
 	if profile == "" {
 		log.Fatal().Msg("profile returned empty which could delete system files on termination")
 	}

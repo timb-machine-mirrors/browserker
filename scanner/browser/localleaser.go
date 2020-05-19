@@ -27,6 +27,7 @@ func NewLocalLeaser() *LocalLeaser {
 		browsers:       make(map[string]*gcd.Gcd),
 	}
 	s.chromeLocation, s.tmp = FindChrome()
+	log.Info().Msgf("FOUND CHROME %s and TMP: %s", s.chromeLocation, s.tmp)
 	return s
 }
 
