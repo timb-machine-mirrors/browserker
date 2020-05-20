@@ -30,4 +30,5 @@ type Config struct {
 	AuthType      AuthType
 	Credentials   *Credentials
 	NumBrowsers   int
+	MaxDepth      int // maximum distance of paths we will traverse
 }

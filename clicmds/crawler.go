@@ -41,6 +41,16 @@ func CrawlerFlags() []cli.Flag {
 			Usage: "enable to profile cpu/mem",
 			Value: false,
 		},
+		&cli.IntFlag{
+			Name:  "numbrowsers",
+			Usage: "max number of browsers to use in parallel",
+			Value: 3,
+		},
+		&cli.IntFlag{
+			Name:  "maxdepth",
+			Usage: "max depth of nav paths to traverse",
+			Value: 10,
+		},
 	}
 }
 
@@ -56,7 +66,8 @@ func Crawler(ctx *cli.Context) error {
 	if ctx.String("config") == "" {
 		cfg = &browserk.Config{
 			URL:         ctx.String("url"),
-			NumBrowsers: 3,
+			NumBrowsers: ctx.Int("numbrowsers"),
+			MaxDepth:    ctx.Int("maxdepth"),
 		}
 	} else {
 		data, err := ioutil.ReadFile(ctx.String("config"))

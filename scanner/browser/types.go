@@ -46,50 +46,50 @@ var (
 	ErrBrowserClosing     = errors.New("unable to load, as closing down")
 )
 
-// ElementNotFoundErr when we are unable to find an element/nodeID
-type ElementNotFoundErr struct {
+// ErrElementNotFound when we are unable to find an element/nodeID
+type ErrElementNotFound struct {
 	Message string
 }
 
-func (e *ElementNotFoundErr) Error() string {
+func (e *ErrElementNotFound) Error() string {
 	return "Unable to find element " + e.Message
 }
 
-// InvalidTabErr when we are unable to access a tab
-type InvalidTabErr struct {
+// ErrInvalidTab when we are unable to access a tab
+type ErrInvalidTab struct {
 	Message string
 }
 
-func (e *InvalidTabErr) Error() string {
+func (e *ErrInvalidTab) Error() string {
 	return "Unable to access tab: " + e.Message
 }
 
-// InvalidNavigationErr when unable to navigate Forward or Back
-type InvalidNavigationErr struct {
+// ErrInvalidNavigation when unable to navigate Forward or Back
+type ErrInvalidNavigation struct {
 	Message string
 }
 
-func (e *InvalidNavigationErr) Error() string {
+func (e *ErrInvalidNavigation) Error() string {
 	return e.Message
 }
 
-// ScriptEvaluationErr returned when an injected script caused an error
-type ScriptEvaluationErr struct {
+// ErrScriptEvaluation returned when an injected script caused an error
+type ErrScriptEvaluation struct {
 	Message          string
 	ExceptionText    string
 	ExceptionDetails *gcdapi.RuntimeExceptionDetails
 }
 
-func (e *ScriptEvaluationErr) Error() string {
+func (e *ErrScriptEvaluation) Error() string {
 	return e.Message + " " + e.ExceptionText
 }
 
-// TimeoutErr when Tab.Navigate has timed out
-type TimeoutErr struct {
+// ErrTimeout when Tab.Navigate has timed out
+type ErrTimeout struct {
 	Message string
 }
 
-func (e *TimeoutErr) Error() string {
+func (e *ErrTimeout) Error() string {
 	return "Timed out " + e.Message
 }
 

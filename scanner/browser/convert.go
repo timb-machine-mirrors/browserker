@@ -18,7 +18,7 @@ func ElementToHTMLElement(ele *Element) *browserk.HTMLElement {
 
 	tag, _ := ele.GetTagName()
 	b.Attributes, _ = ele.GetAttributes()
-	b.Depth = ele.Depth()
+	b.NodeDepth = ele.Depth()
 	listeners, err := ele.GetEventListeners()
 	b.InnerText = ele.GetInnerText()
 	if err == nil {

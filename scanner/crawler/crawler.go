@@ -26,6 +26,8 @@ func (b *BrowserkCrawler) Init() error {
 
 // Process the next navigation entry
 func (b *BrowserkCrawler) Process(bctx *browserk.Context, browser browserk.Browser, entry *browserk.Navigation, isFinal bool) (*browserk.NavigationResult, []*browserk.Navigation, error) {
+	diff := NewElementDiffer()
+
 	errors := make([]error, 0)
 	startURL, err := browser.GetURL()
 	if err != nil {
@@ -36,6 +38,10 @@ func (b *BrowserkCrawler) Process(bctx *browserk.Context, browser browserk.Brows
 	//clear out storage and console events before executing our action
 	browser.GetStorageEvents()
 	browser.GetConsoleEvents()
+
+	if isFinal && entry.Distance != 0 {
+		diff = b.snapshot(bctx, browser)
+	}
 
 	result := &browserk.NavigationResult{
 		ID:           nil,
@@ -61,7 +67,7 @@ func (b *BrowserkCrawler) Process(bctx *browserk.Context, browser browserk.Brows
 	// find new potential navigation entries (if isFinal)
 	potentialNavs := make([]*browserk.Navigation, 0)
 	if isFinal {
-		potentialNavs = b.FindNewNav(bctx, entry, browser)
+		potentialNavs = b.FindNewNav(bctx, diff, entry, browser)
 	}
 	return result, potentialNavs, nil
 }
@@ -86,8 +92,41 @@ func (b *BrowserkCrawler) buildResult(result *browserk.NavigationResult, start t
 	result.Hash()
 }
 
+func (b *BrowserkCrawler) snapshot(bctx *browserk.Context, browser browserk.Browser) *ElementDiffer {
+	diff := NewElementDiffer()
+	browser.RefreshDocument()
+	baseHref := browser.GetBaseHref()
+	formElements, err := browser.FindForms()
+	if err == nil {
+		for _, ele := range formElements {
+			diff.Add(browserk.FORM, ele.Hash())
+			for _, child := range ele.ChildElements {
+				diff.Add(child.Type, child.Hash())
+			}
+		}
+	}
+
+	bElements, err := browser.FindElements("button")
+	if err == nil {
+		for _, ele := range bElements {
+			diff.Add(browserk.BUTTON, ele.Hash())
+		}
+	}
+
+	aElements, err := browser.FindElements("a")
+	if err == nil {
+		for _, ele := range aElements {
+			scope := resolveScopeRef(bctx, baseHref, ele.Attributes["href"])
+			if scope == browserk.InScope {
+				diff.Add(browserk.A, ele.Hash())
+			}
+		}
+	}
+	return diff
+}
+
 // FindNewNav potentials TODO: get navigation entry metadata (is vuejs/react etc) to be more specific
-func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, entry *browserk.Navigation, browser browserk.Browser) []*browserk.Navigation {
+func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer, entry *browserk.Navigation, browser browserk.Browser) []*browserk.Navigation {
 	navs := make([]*browserk.Navigation, 0)
 	browser.RefreshDocument()
 	baseHref := browser.GetBaseHref()
@@ -101,7 +140,7 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, entry *browserk.Nav
 		for _, form := range formElements {
 
 			scope := resolveScopeRef(bctx, baseHref, form.Attributes["action"])
-			if scope == browserk.InScope {
+			if scope == browserk.InScope && !diff.Has(browserk.FORM, form.Hash()) {
 				nav := browserk.NewNavigationFromForm(entry, browserk.TrigCrawler, form)
 				nav.Scope = scope
 				navs = append(navs, nav)
@@ -117,26 +156,33 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, entry *browserk.Nav
 	} else if bElements != nil && len(bElements) > 0 {
 		log.Debug().Int("button_count", len(bElements)).Msg("found buttons")
 		for _, b := range bElements {
-			navs = append(navs, browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, b, browserk.ActLeftClick))
+			if !diff.Has(browserk.BUTTON, b.Hash()) {
+				navs = append(navs, browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, b, browserk.ActLeftClick))
+			}
 		}
 	}
 
 	// pull out links (lower priority)
 	aElements, err := browser.FindElements("a")
 	if err != nil {
-		log.Info().Err(err).Msg("error while extracting links")
-	} else if aElements != nil && len(aElements) > 0 {
-		log.Debug().Int("link_count", len(aElements)).Msg("found links")
-		for _, a := range aElements {
-			scope := resolveScopeRef(bctx, baseHref, a.Attributes["href"])
-			if scope == browserk.InScope {
-				log.Info().Str("href", a.Attributes["href"]).Msg("in scope, adding")
-				nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, a, browserk.ActLeftClick)
-				nav.Scope = scope
-				navs = append(navs, nav)
-			} else {
-				log.Debug().Str("baseHref", baseHref).Str("linkHref", a.Attributes["href"]).Msg("was out of scope, not creating new nav")
-			}
+		log.Error().Err(err).Msg("error while extracting links")
+		return navs
+	} else if aElements == nil || len(aElements) == 0 {
+		log.Warn().Msg("error while extracting links")
+		return navs
+	}
+
+	log.Debug().Int("link_count", len(aElements)).Msg("found links")
+	for _, a := range aElements {
+		scope := resolveScopeRef(bctx, baseHref, a.Attributes["href"])
+
+		if scope == browserk.InScope && !diff.Has(browserk.A, a.Hash()) {
+			log.Info().Str("href", a.Attributes["href"]).Msg("in scope, adding")
+			nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, a, browserk.ActLeftClick)
+			nav.Scope = scope
+			navs = append(navs, nav)
+		} else {
+			log.Debug().Str("baseHref", baseHref).Str("linkHref", a.Attributes["href"]).Msg("was out of scope, not creating new nav")
 		}
 	}
 

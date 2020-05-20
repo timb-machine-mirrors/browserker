@@ -5,8 +5,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
-	"github.com/pkg/errors"
 	"github.com/rs/zerolog/log"
 
 	"gitlab.com/browserker/browserk"
@@ -23,7 +21,7 @@ type Browserk struct {
 	crawlGraph   browserk.CrawlGrapher
 	reporter     browserk.Reporter
 	browsers     browserk.BrowserPool
-	navEntryCh   chan [][]*browserk.Navigation
+	navCh        chan []*browserk.Navigation
 	readyCh      chan struct{}
 	stateMonitor *time.Ticker
 	mainContext  *browserk.Context
@@ -58,8 +56,8 @@ func (b *Browserk) Init(ctx context.Context) error {
 		Crawl:       b.crawlGraph,
 		Attack:      b.attackGraph,
 	}
-
-	b.navEntryCh = make(chan [][]*browserk.Navigation, b.cfg.NumBrowsers)
+	log.Info().Int("num_browsers", b.cfg.NumBrowsers).Int("max_depth", b.cfg.MaxDepth).Msg("Initializing...")
+	b.navCh = make(chan []*browserk.Navigation, b.cfg.NumBrowsers)
 	b.readyCh = make(chan struct{})
 
 	log.Logger.Info().Msg("initializing attack graph")
@@ -102,7 +100,6 @@ func (b *Browserk) initNavigation() {
 	if !b.crawlGraph.NavExists(nav) {
 		b.crawlGraph.AddNavigation(nav)
 		log.Info().Msg("Load URL added to crawl graph")
-		spew.Dump(nav)
 	} else {
 		log.Info().Msg("Navigation for Load URL already exists")
 	}
@@ -130,6 +127,7 @@ func (b *Browserk) scopeService(target *url.URL) browserk.ScopeService {
 // Start the browsers
 func (b *Browserk) Start() error {
 	for {
+
 		log.Info().Msg("searching for new navigation entries")
 		entries := b.crawlGraph.Find(b.mainContext.Ctx, browserk.NavUnvisited, browserk.NavInProcess, int64(b.cfg.NumBrowsers))
 		if entries == nil || len(entries) == 0 && b.browsers.Leased() == 0 {
@@ -137,7 +135,9 @@ func (b *Browserk) Start() error {
 			return nil
 		}
 		log.Info().Int("entries", len(entries)).Msg("Found entries")
-		b.navEntryCh <- entries
+		for _, nav := range entries {
+			b.navCh <- nav
+		}
 		log.Info().Msg("Waiting for crawler to complete")
 		<-b.readyCh
 	}
@@ -148,63 +148,62 @@ func (b *Browserk) processEntries() {
 		select {
 		case <-b.stateMonitor.C:
 			// TODO: check graph for inprocess values that never made it and reset them to unvisited
-			log.Info().Msg("state monitor ping")
+			log.Info().Int("leased_browsers", b.browsers.Leased()).Msg("state monitor ping")
 		case <-b.mainContext.Ctx.Done():
 			log.Info().Msg("scan finished due to context complete")
 			return
-		case entries := <-b.navEntryCh:
-			if err := b.crawl(entries); err != nil {
-				log.Error().Err(err).Msg("crawl entries failed")
-			}
+		case nav := <-b.navCh:
+			log.Info().Int("leased_browsers", b.browsers.Leased()).Msg("processing nav")
+			go b.crawl(nav)
 			log.Info().Msg("Crawler to complete")
-			b.readyCh <- struct{}{}
+			//
 		}
 	}
 }
 
-func (b *Browserk) crawl(entries [][]*browserk.Navigation) error {
+func (b *Browserk) crawl(navs []*browserk.Navigation) {
 	navCtx := b.mainContext.Copy()
 
-	for _, navs := range entries {
-		browser, port, err := b.browsers.Take(navCtx)
-		if err != nil {
-			return err
-		}
-
-		crawler := crawler.New(b.cfg)
-		if err := crawler.Init(); err != nil {
-			b.browsers.Return(navCtx.Ctx, port)
-			return errors.Wrap(err, "failed to init crawler")
-		}
-
-		for i, nav := range navs {
-			isFinal := false
-			ctx, cancel := context.WithTimeout(navCtx.Ctx, time.Second*45)
-			navCtx.Ctx = ctx
-			defer cancel()
-
-			// we are on the last navigation of this path so we'll want to capture some stuff
-			if i == len(navs)-1 {
-				isFinal = true
-			}
-
-			result, newNavs, err := crawler.Process(navCtx, browser, nav, isFinal)
-			if err != nil {
-				log.Error().Err(err).Msg("failed to process action")
-			}
-			log.Info().Int("nav_count", len(newNavs)).Bool("is_final", isFinal).Msg("adding new navs")
-			if err := b.crawlGraph.AddNavigations(newNavs); err != nil {
-				log.Error().Err(err).Msg("failed to add new navigations")
-			}
-
-			if err := b.crawlGraph.AddResult(result); err != nil {
-				log.Error().Err(err).Msg("failed to add result")
-			}
-		}
-		browser.Close()
-		b.browsers.Return(navCtx.Ctx, port)
+	browser, port, err := b.browsers.Take(navCtx)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to take browser")
+		return
 	}
-	return nil
+
+	crawler := crawler.New(b.cfg)
+	if err := crawler.Init(); err != nil {
+		b.browsers.Return(navCtx.Ctx, port)
+		log.Error().Err(err).Msg("failed to init crawler")
+		return
+	}
+
+	for i, nav := range navs {
+		isFinal := false
+		ctx, cancel := context.WithTimeout(navCtx.Ctx, time.Second*45)
+		navCtx.Ctx = ctx
+		defer cancel()
+
+		// we are on the last navigation of this path so we'll want to capture some stuff
+		if i == len(navs)-1 {
+			isFinal = true
+		}
+
+		result, newNavs, err := crawler.Process(navCtx, browser, nav, isFinal)
+		if err != nil {
+			log.Error().Err(err).Msg("failed to process action")
+		}
+		log.Info().Int("nav_count", len(newNavs)).Bool("is_final", isFinal).Msg("adding new navs")
+		if err := b.crawlGraph.AddNavigations(newNavs); err != nil {
+			log.Error().Err(err).Msg("failed to add new navigations")
+		}
+
+		if err := b.crawlGraph.AddResult(result); err != nil {
+			log.Error().Err(err).Msg("failed to add result")
+		}
+	}
+	browser.Close()
+	b.browsers.Return(navCtx.Ctx, port)
+	b.readyCh <- struct{}{}
 }
 
 // Stop the browsers

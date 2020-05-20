@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/rand"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -83,7 +82,7 @@ func NewTab(ctx *browserk.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *
 	t.stabilityTimeout = 2 * time.Second   // default 2 seconds before we give up waiting for stability
 	t.stableAfter = 300 * time.Millisecond // default 300 ms for considering the DOM stable
 	t.domChangeHandler = nil
-
+	t.baseHref.Store("")
 	t.disconnectedHandler = t.defaultDisconnectedHandler
 	go t.listenDebuggerEvents(ctx)
 	t.subscribeBrowserEvents(ctx, true)
@@ -125,20 +124,8 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 			return nil, false, err
 		}
 		err = ele.Click()
-		// add small delay after click
-		timer := time.NewTimer(time.Millisecond * 200)
-		defer timer.Stop()
-
-		select {
-		case <-timer.C:
-		case <-ctx.Done():
-		}
-
-		if t.IsTransitioning() {
-			log.Info().Msg("CLICK CAUSED TRANSITION EVENT!")
-			t.waitReady(ctx, t.stabilityTimeout)
-		}
-
+	case browserk.ActFillForm:
+		t.FillForm(act)
 	case browserk.ActLeftClickDown:
 	case browserk.ActLeftClickUp:
 	case browserk.ActRightClick:
@@ -155,6 +142,18 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 	case browserk.ActFocus:
 	case browserk.ActWait:
 	}
+	// add small delay after action
+	timer := time.NewTimer(time.Millisecond * 200)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+	case <-ctx.Done():
+	}
+
+	if t.IsTransitioning() {
+		t.waitReady(ctx, t.stabilityTimeout)
+	}
 	// Call JSAfter hooks
 
 	t.ctx.NextJSAfter(t)
@@ -165,10 +164,45 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 	return nil, causedLoad, err
 }
 
+// FillForm for an action
+// TODO: handle checkbox, radio, selects etc
+func (t *Tab) FillForm(act *browserk.Action) error {
+	if act.Form == nil {
+		return &ErrInvalidElement{}
+	}
+	form, err := t.FindByHTMLElement(act.Form)
+	if err != nil {
+		return err
+	}
+
+	form.Focus()
+
+	submitButton := &Element{}
+	for _, htmlElement := range act.Form.ChildElements {
+		ele, err := t.FindByHTMLElement(htmlElement)
+		if err != nil {
+			return &ErrElementNotFound{}
+		}
+		switch htmlElement.Type {
+		case browserk.BUTTON:
+			submitButton = ele
+		case browserk.INPUT:
+			if htmlElement.Attributes["type"] == "submit" {
+				submitButton = ele
+				continue
+			}
+			ele.Focus()
+			ele.SendKeys(act.Element.Value)
+		}
+	}
+
+	return submitButton.Click()
+}
+
 // Navigate to the url
 func (t *Tab) Navigate(ctx context.Context, url string) error {
 	if t.IsNavigating() {
-		return &InvalidNavigationErr{Message: "Unable to navigate, already navigating."}
+		return &ErrInvalidNavigation{Message: "Unable to navigate, already navigating."}
 	}
 
 	t.setIsNavigating(true)
@@ -208,14 +242,11 @@ func (t *Tab) ID() int64 {
 }
 
 // FindByHTMLElement returns a gcd Element for interacting
-func (t *Tab) FindByHTMLElement(ele *browserk.HTMLElement) (*Element, error) {
+func (t *Tab) FindByHTMLElement(ele browserk.ActHTMLElement) (*Element, error) {
 	if ele == nil {
 		return nil, &ErrInvalidElement{}
 	}
-	tag := strings.ToLower(browserk.HTMLTypeToStrMap[ele.Type])
-	if ele.Type == browserk.CUSTOM {
-		tag = ele.CustomTagName
-	}
+	tag := ele.Tag()
 
 	eles, err := t.GetElementsBySelector(tag)
 	if err != nil {
@@ -224,12 +255,12 @@ func (t *Tab) FindByHTMLElement(ele *browserk.HTMLElement) (*Element, error) {
 
 	for _, found := range eles {
 		h := ElementToHTMLElement(found)
-		if bytes.Compare(h.Hash(), ele.Hash()) == 0 && h.Depth == ele.Depth {
+		if bytes.Compare(h.Hash(), ele.Hash()) == 0 && h.NodeDepth == ele.Depth() {
 			log.Info().Msg("found by nearly exact match")
 			return found, nil
 		}
 	}
-	return nil, &ElementNotFoundErr{}
+	return nil, &ErrElementNotFound{}
 }
 
 // FindElements elements via querySelector, does not pull out children
@@ -542,7 +573,7 @@ func (t *Tab) ForwardEntry() (*gcdapi.PageNavigationEntry, error) {
 			return entries[i], nil
 		}
 	}
-	return nil, &InvalidNavigationErr{Message: "Unable to navigate forward as we are on the latest navigation entry"}
+	return nil, &ErrInvalidNavigation{Message: "Unable to navigate forward as we are on the latest navigation entry"}
 }
 
 // Back the previous navigation entry from the history and navigates to it.
@@ -568,7 +599,7 @@ func (t *Tab) BackEntry() (*gcdapi.PageNavigationEntry, error) {
 			return entries[i], nil
 		}
 	}
-	return nil, &InvalidNavigationErr{Message: "Unable to navigate backward as we are on the first navigation entry"}
+	return nil, &ErrInvalidNavigation{Message: "Unable to navigate backward as we are on the first navigation entry"}
 }
 
 // GetScriptSource of a script by its scriptID.
@@ -598,7 +629,7 @@ func (t *Tab) getDocument() (*Element, error) {
 func (t *Tab) GetDocument() (*Element, error) {
 	docEle, ok := t.getElement(t.getTopNodeID())
 	if !ok {
-		return nil, &ElementNotFoundErr{Message: "top document node ID not found."}
+		return nil, &ErrElementNotFound{Message: "top document node ID not found."}
 	}
 	return docEle, nil
 }
@@ -656,7 +687,7 @@ func (t *Tab) getDocumentElementByID(docNodeID int, attributeID string) (*Elemen
 
 	docNode, ok := t.getElement(docNodeID)
 	if !ok {
-		return nil, false, &ElementNotFoundErr{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
+		return nil, false, &ErrElementNotFound{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
 	}
 
 	selector := "#" + attributeID
@@ -814,7 +845,7 @@ func (t *Tab) GetPageSource(docNodeID int) (string, error) {
 	}
 	doc, ok := t.getElement(docNodeID)
 	if !ok {
-		return "", &ElementNotFoundErr{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
+		return "", &ErrElementNotFound{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
 	}
 	outerParams := &gcdapi.DOMGetOuterHTMLParams{NodeId: doc.ID}
 	return t.t.DOM.GetOuterHTMLWithParams(outerParams)
@@ -829,13 +860,13 @@ func (t *Tab) GetURL() (string, error) {
 func (t *Tab) GetDocumentCurrentURL(docNodeID int) (string, error) {
 	docNode, ok := t.getElement(docNodeID)
 	if !ok {
-		return "", &ElementNotFoundErr{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
+		return "", &ErrElementNotFound{Message: fmt.Sprintf("docNodeID %d not found", docNodeID)}
 	}
 	return docNode.node.DocumentURL, nil
 }
 
 // Screenshot returns a png image, base64 encoded, or error if failed
-func (t *Tab) Screenshot(ctx context.Context) (string, error) {
+func (t *Tab) Screenshot() (string, error) {
 	params := &gcdapi.PageCaptureScreenshotParams{
 		Format:  "png",
 		Quality: 100,

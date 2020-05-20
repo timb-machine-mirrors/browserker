@@ -595,6 +595,18 @@ func (e *Element) Focus() error {
 	return err
 }
 
+// ScrollTo the element if needed
+func (e *Element) ScrollTo() error {
+	e.lock.RLock()
+	defer e.lock.RUnlock()
+
+	params := &gcdapi.DOMScrollIntoViewIfNeededParams{
+		NodeId: e.ID,
+	}
+	_, err := e.tab.t.DOM.ScrollIntoViewIfNeededWithParams(params)
+	return err
+}
+
 // MouseOver the center of the element.
 func (e *Element) MouseOver() error {
 	x, y, err := e.getCenter()

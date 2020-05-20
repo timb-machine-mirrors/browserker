@@ -90,7 +90,6 @@ func (s *ScopeService) Check(uri string) browserk.Scope {
 	} else if !strings.HasPrefix(lowered, "/") {
 		lowered = "/" + lowered
 	}
-	log.Info().Str("host", host).Str("uri", lowered).Msg("checking relative")
 	return s.CheckRelative(host, lowered)
 }
 

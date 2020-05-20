@@ -6,6 +6,13 @@ import (
 	"strings"
 )
 
+type ActHTMLElement interface {
+	Tag() string
+	ElementType() HTMLElementType
+	Depth() int
+	Hash() []byte
+}
+
 // HTMLElement type
 type HTMLElement struct {
 	Type          HTMLElementType
@@ -14,8 +21,9 @@ type HTMLElement struct {
 	Attributes    map[string]string
 	InnerText     string
 	Hidden        bool
-	Depth         int
+	NodeDepth     int
 	ID            []byte
+	Value         string // value to set if it's an input field or whatever
 }
 
 // Hash the element to (hopefully) a unique value
@@ -34,12 +42,28 @@ func (h *HTMLElement) Hash() []byte {
 	return h.ID
 }
 
+func (h *HTMLElement) ElementType() HTMLElementType {
+	return h.Type
+}
+
+func (h *HTMLElement) Tag() string {
+	tag := strings.ToLower(HTMLTypeToStrMap[h.Type])
+	if h.Type == CUSTOM {
+		tag = h.CustomTagName
+	}
+	return tag
+}
+
+func (h *HTMLElement) Depth() int {
+	return h.NodeDepth
+}
+
 // HTMLFormElement and it's children
 type HTMLFormElement struct {
 	Events        []HTMLEventType
 	Attributes    map[string]string
 	Hidden        bool
-	Depth         int
+	NodeDepth     int
 	ChildElements []*HTMLElement // capture all children (labels etc) so we can do context analysis
 	ID            []byte
 }
@@ -63,6 +87,18 @@ func (h *HTMLFormElement) Hash() []byte {
 	hash.Write([]byte(sorted))
 	h.ID = hash.Sum(nil)
 	return h.ID
+}
+
+func (h *HTMLFormElement) ElementType() HTMLElementType {
+	return FORM
+}
+
+func (h *HTMLFormElement) Tag() string {
+	return "form"
+}
+
+func (h *HTMLFormElement) Depth() int {
+	return h.NodeDepth
 }
 
 // ImportantAttributeValues extracts the values for important attributes depending on HTMLElementType

@@ -25,6 +25,7 @@ type Context struct {
 	CtxComplete func()
 	Auth        AuthService
 	Scope       ScopeService
+	FormHandler FormHandler
 	Reporter    Reporter
 	Injector    Injector
 	Crawl       CrawlGrapher
@@ -52,6 +53,7 @@ func (c *Context) Copy() *Context {
 		Ctx:             c.Ctx,
 		CtxComplete:     c.CtxComplete,
 		Scope:           c.Scope,
+		FormHandler:     c.FormHandler,
 		Reporter:        c.Reporter,
 		Injector:        c.Injector,
 		Crawl:           c.Crawl,
