@@ -177,26 +177,31 @@ func (b *Browserk) crawl(navs []*browserk.Navigation) {
 		return
 	}
 
+	isFinal := false
 	for i, nav := range navs {
-		isFinal := false
-		ctx, cancel := context.WithTimeout(navCtx.Ctx, time.Second*45)
-		navCtx.Ctx = ctx
-		defer cancel()
-
 		// we are on the last navigation of this path so we'll want to capture some stuff
 		if i == len(navs)-1 {
 			isFinal = true
 		}
 
+		ctx, cancel := context.WithTimeout(navCtx.Ctx, time.Second*45)
+		navCtx.Ctx = ctx
+		defer cancel()
+
 		result, newNavs, err := crawler.Process(navCtx, browser, nav, isFinal)
 		if err != nil {
 			log.Error().Err(err).Msg("failed to process action")
-		}
-		log.Info().Int("nav_count", len(newNavs)).Bool("is_final", isFinal).Msg("adding new navs")
-		if err := b.crawlGraph.AddNavigations(newNavs); err != nil {
-			log.Error().Err(err).Msg("failed to add new navigations")
+			// TODO: write error result / update nav
+			break
 		}
 
+		if isFinal {
+			log.Info().Int("nav_count", len(newNavs)).Bool("is_final", isFinal).Msg("adding new navs")
+			if err := b.crawlGraph.AddNavigations(newNavs); err != nil {
+				log.Error().Err(err).Msg("failed to add new navigations")
+			}
+			// TODO: write to graph that navigation has been visited
+		}
 		if err := b.crawlGraph.AddResult(result); err != nil {
 			log.Error().Err(err).Msg("failed to add result")
 		}

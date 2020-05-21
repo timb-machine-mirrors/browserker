@@ -93,6 +93,23 @@ func (s *ScopeService) Check(uri string) browserk.Scope {
 	return s.CheckRelative(host, lowered)
 }
 
+// ResolveBaseHref for html document links
+func (s *ScopeService) ResolveBaseHref(baseHref, candidate string) browserk.Scope {
+	var scope browserk.Scope
+
+	if strings.HasPrefix(candidate, "http") {
+		scope = s.Check(candidate)
+	} else {
+		if baseHref != "" && strings.HasPrefix(baseHref, "http") {
+			if !strings.HasSuffix(baseHref, "/") {
+				baseHref += "/"
+			}
+		}
+		scope = s.Check(baseHref + candidate)
+	}
+	return scope
+}
+
 // CheckRelative hosts to see if it's in scope
 // First we check if excluded, then we check if it's ignored,
 // then we check if the uri is excluded and finally if it's allowed

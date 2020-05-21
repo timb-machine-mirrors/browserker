@@ -2,7 +2,6 @@ package crawler
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -116,7 +115,7 @@ func (b *BrowserkCrawler) snapshot(bctx *browserk.Context, browser browserk.Brow
 	aElements, err := browser.FindElements("a")
 	if err == nil {
 		for _, ele := range aElements {
-			scope := resolveScopeRef(bctx, baseHref, ele.Attributes["href"])
+			scope := bctx.Scope.ResolveBaseHref(baseHref, ele.Attributes["href"])
 			if scope == browserk.InScope {
 				diff.Add(browserk.A, ele.Hash())
 			}
@@ -135,30 +134,27 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 	formElements, err := browser.FindForms()
 	if err != nil {
 		log.Info().Err(err).Msg("error while extracting forms")
-	} else if formElements != nil && len(formElements) > 0 {
-		log.Debug().Int("form_count", len(formElements)).Msg("found new forms")
-		for _, form := range formElements {
+	}
 
-			scope := resolveScopeRef(bctx, baseHref, form.Attributes["action"])
-			if scope == browserk.InScope && !diff.Has(browserk.FORM, form.Hash()) {
-				nav := browserk.NewNavigationFromForm(entry, browserk.TrigCrawler, form)
-				nav.Scope = scope
-				navs = append(navs, nav)
-			} else {
-				log.Debug().Str("href", baseHref).Str("action", form.Attributes["action"]).Msg("was out of scope, not creating new nav")
-			}
+	for _, form := range formElements {
+		scope := bctx.Scope.ResolveBaseHref(baseHref, form.Attributes["action"])
+		if scope == browserk.InScope && !diff.Has(browserk.FORM, form.Hash()) {
+			nav := browserk.NewNavigationFromForm(entry, browserk.TrigCrawler, form)
+			bctx.FormHandler.Fill(form)
+			navs = append(navs, nav)
+		} else {
+			log.Debug().Str("href", baseHref).Str("action", form.Attributes["action"]).Msg("was out of scope or already found, not creating new nav")
 		}
 	}
 
 	bElements, err := browser.FindElements("button")
 	if err != nil {
 		log.Info().Err(err).Msg("error while extracting buttons")
-	} else if bElements != nil && len(bElements) > 0 {
-		log.Debug().Int("button_count", len(bElements)).Msg("found buttons")
-		for _, b := range bElements {
-			if !diff.Has(browserk.BUTTON, b.Hash()) {
-				navs = append(navs, browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, b, browserk.ActLeftClick))
-			}
+	}
+
+	for _, b := range bElements {
+		if !diff.Has(browserk.BUTTON, b.Hash()) {
+			navs = append(navs, browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, b, browserk.ActLeftClick))
 		}
 	}
 
@@ -174,7 +170,7 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 
 	log.Debug().Int("link_count", len(aElements)).Msg("found links")
 	for _, a := range aElements {
-		scope := resolveScopeRef(bctx, baseHref, a.Attributes["href"])
+		scope := bctx.Scope.ResolveBaseHref(baseHref, a.Attributes["href"])
 
 		if scope == browserk.InScope && !diff.Has(browserk.A, a.Hash()) {
 			log.Info().Str("href", a.Attributes["href"]).Msg("in scope, adding")
@@ -188,22 +184,4 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 
 	// todo pull out additional clickable/whateverable elements
 	return navs
-}
-
-// resolveScopeRef checks if the baseHref + potential link is in scope
-func resolveScopeRef(bctx *browserk.Context, baseHref, candidate string) browserk.Scope {
-	var scope browserk.Scope
-
-	if strings.HasPrefix(candidate, "http") {
-		scope = bctx.Scope.Check(candidate)
-	} else {
-		if baseHref != "" && strings.HasPrefix(baseHref, "http") {
-			if !strings.HasSuffix(baseHref, "/") {
-				baseHref += "/"
-			}
-		}
-		scope = bctx.Scope.Check(baseHref + candidate)
-	}
-
-	return scope
 }

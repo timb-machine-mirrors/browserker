@@ -265,12 +265,12 @@ func (t *Tab) FindByHTMLElement(ele browserk.ActHTMLElement) (*Element, error) {
 
 // FindElements elements via querySelector, does not pull out children
 func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error) {
+	bElements := make([]*browserk.HTMLElement, 0)
 	elements, err := t.GetElementsBySelector(querySelector)
 	if err != nil {
-		return nil, err
+		return bElements, err
 	}
 
-	bElements := make([]*browserk.HTMLElement, 0)
 	for _, ele := range elements {
 		bElements = append(bElements, ElementToHTMLElement(ele))
 	}
@@ -286,11 +286,13 @@ func (t *Tab) GetBaseHref() string {
 // FindForms finds forms and pulls out all child elements.
 // we may need more than just input fields (labels) etc for context
 func (t *Tab) FindForms() ([]*browserk.HTMLFormElement, error) {
+	fElements := make([]*browserk.HTMLFormElement, 0)
+
 	elements, err := t.GetElementsBySelector("form")
 	if err != nil {
-		return nil, err
+		return fElements, err
 	}
-	fElements := make([]*browserk.HTMLFormElement, 0)
+
 	for _, form := range elements {
 		f := &browserk.HTMLFormElement{
 			Events:        make([]browserk.HTMLEventType, 0),

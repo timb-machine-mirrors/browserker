@@ -19,4 +19,5 @@ type ScopeService interface {
 	ExcludeForms(idsOrNames []string)
 	Check(uri string) Scope
 	CheckRelative(base, relative string) Scope
+	ResolveBaseHref(baseHref, candidate string) Scope
 }

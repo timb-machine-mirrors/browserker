@@ -58,8 +58,29 @@ func (h *HTMLElement) Depth() int {
 	return h.NodeDepth
 }
 
+// FormType determine what type of form it is
+type FormType int8
+
+//revive:disable:var-export
+const (
+	FormLogin FormType = iota
+	FormLogout
+	FormUserRegistration
+	FormSignUp // letters etc
+	FormContact
+	FormComment
+	FormSearch
+	FormCreate
+	FormDelete
+	FormEdit
+	FormBilling
+	FormAddress
+	// TODO: Add more, or scan the top 1mil sites and extract all forms or something
+)
+
 // HTMLFormElement and it's children
 type HTMLFormElement struct {
+	FormType      FormType
 	Events        []HTMLEventType
 	Attributes    map[string]string
 	Hidden        bool
