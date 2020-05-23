@@ -17,6 +17,58 @@ const (
 	Raw
 )
 
+type FormData struct {
+	// Name/User related
+	UserName      string
+	Password      string
+	FirstName     string
+	MiddleInitial string
+	MiddleName    string
+	LastName      string
+	FullName      string
+
+	// address related
+	Address          string
+	AddressLine1     string
+	AddressLine2     string
+	AddressLineExtra string
+	StatePrefecture  string
+	Country          string
+	ZipCode          string
+	City             string
+
+	// credit card related
+	NameOnCard      string
+	CardNumber      string
+	CardCVC         string
+	ExpirationMonth string
+	ExpirationYear  string
+
+	Email string
+
+	// Phone related
+	PhoneNumber string
+	CountryCode string
+	AreaCode    string
+	Extension   string
+
+	// Travel related
+	PassportNumber    string
+	TravelOrigin      string
+	TravelDestination string
+
+	// misc related
+	Default      string
+	SearchTerm   string
+	CommentTitle string
+	CommentText  string
+	DocumentName string
+	URL          string
+	Network      string
+	IPV4         string
+	IPV6         string
+}
+
 // Config for browserker
 type Config struct {
 	URL           string
@@ -30,5 +82,6 @@ type Config struct {
 	AuthType      AuthType
 	Credentials   *Credentials
 	NumBrowsers   int
-	MaxDepth      int // maximum distance of paths we will traverse
+	MaxDepth      int       // maximum distance of paths we will traverse
+	FormData      *FormData // config form data
 }

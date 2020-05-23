@@ -1,16 +1,16 @@
 //revive:disable
 package crawler
 
-import "regexp"
+import (
+	"regexp"
+)
+
+// TODO: Should probably expose these as a config option to modify
 
 // taken from https://source.chromium.org/chromium/chromium/src/+/master:components/autofill/core/common/autofill_regex_constants.cc?originalUrl=https:%2F%2Fcs.chromium.org%2F
 // TODO: Fix up and replace with more relevant
-
-type FormTypeDetector struct {
-}
-
-type FormInputFieldDetector struct {
-}
+var DateStartRe = regexp.MustCompile("start|depart|leave|begin|from")
+var DateEndRe = regexp.MustCompile("end|arrive|return|final|to")
 
 var AttentionIgnoredRe = regexp.MustCompile("attention|attn")
 var RegionIgnoredRe = regexp.MustCompile("province|region|other|provincia|bairro|suburb")
@@ -19,7 +19,7 @@ var CompanyRe = regexp.MustCompile("company|business|organization|organisation|f
 var AddressLine1Re = regexp.MustCompile("^address$|address[_-]?line(one)?|address1|addr1|street|(?:shipping|billing)address$|strasse|straße|hausnummer|housenumber|house.?name|direccion|dirección|adresse|indirizzo|^住所$|住所1|morada|Адрес|地址|(\\b|_)adres(\\b|_)|^주소.?$|주소.?1")
 var AddressLine1LabelRe = regexp.MustCompile("(^\\W*address)|(address\\W*$)|(?:shipping|billing|mailing|pick.?up|drop.?off|delivery|sender|postal|recipient|home|work|office|school|business|mail)[\\s\\-]+address|address\\s+(of|for|to|from)|adresse|indirizzo|住所|地址|(\\b|_)adres(\\b|_) |주소")
 var AddressLine2Re = regexp.MustCompile("address[_-]?line(2|two)|address2|addr2|street|suite|unit|adresszusatz|ergänzende.?angaben|direccion2|colonia|adicional|addresssuppl|complementnom|appartement|indirizzo2|住所2|complemento|addrcomplement|Улица|地址2|주소.?2")
-var AddressLine2LabelRe = regexp.MustCompile("address|line|adresse|indirizzo|地址|주소")
+var AddressLine2LabelRe = regexp.MustCompile("address2|line2|adresse|indirizzo|地址|주소")
 var AddressLinesExtraRe = regexp.MustCompile("address.*line[3-9]|address[3-9]|addr[3-9]|street|line[3-9]|municipio|batiment|residence|indirizzo[3-9]")
 var AddressLookupRe = regexp.MustCompile("lookup")
 var CountryRe = regexp.MustCompile("country|countries|país|pais|(入国|出国)|国家|국가|나라|(\\b|_)ulce(\\b|_)|کشور")
@@ -144,4 +144,13 @@ var UrlSearchActionRe = regexp.MustCompile("/search(/|((\\w*\\.\\w+)?$))")
 // form_parser.cc
 /////////////////////////////////////////////////////////////////////////////
 var SocialSecurityRe = regexp.MustCompile("ssn|social.?security.?(num(ber)?|#)*")
+var PasswordRe = regexp.MustCompile("password|passwd|pwd|pass|パスワード")
 var OneTimePwdRe = regexp.MustCompile("one.?time|sms.?(code|token|password|pwd|pass)")
+
+// Others
+var CommentTitleRe = regexp.MustCompile("title|sub(ject)")
+var CommentRe = regexp.MustCompile("comment|reply|answer|message|text|msg|resp(ponse)")
+
+var NetworkMaskRe = regexp.MustCompile("netmask|network_mask|subnet(_mask)")
+var IPAddressRe = regexp.MustCompile("ip(_addr)|ip_address|gateway|ipv4.+")
+var IPV6AddressRe = regexp.MustCompile("ipv6(_addr)|ipv6_address|ipv6.+")

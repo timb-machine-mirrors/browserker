@@ -8,6 +8,76 @@ import (
 	"gitlab.com/browserker/browserk"
 )
 
+// MakeMockAddressForm for an example address form
+func MakeMockAddressForm() *browserk.HTMLFormElement {
+
+	children := make([]*browserk.HTMLElement, 0)
+	children = append(children, MakeMockLabel("fname", "First Name"))
+	children = append(children, MakeMockInput("text", "fname", "John"))
+	children = append(children, MakeMockLabel("lname", "Last Name"))
+	children = append(children, MakeMockInput("text", "lname", "Doe"))
+	children = append(children, MakeMockLabel("email", "E-Mail"))
+	children = append(children, MakeMockInput("email", "email", "test@test.com"))
+	children = append(children, MakeMockLabel("address", "Address"))
+	children = append(children, MakeMockInput("text", "address", ""))
+	children = append(children, MakeMockLabel("addr2", "Address Line 2"))
+	children = append(children, MakeMockInput("text", "addr2", ""))
+	children = append(children, MakeMockLabel("city", "City Name"))
+	children = append(children, MakeMockInput("text", "city", ""))
+	children = append(children, MakeMockLabel("state", "State"))
+	children = append(children, MakeMockInput("text", "state", "CA"))
+	children = append(children, MakeMockLabel("zip_code", "ZipCode"))
+	children = append(children, MakeMockInput("text", "zip_code", ""))
+	children = append(children, MakeMockLabel("country", "Country"))
+	children = append(children, MakeMockInput("text", "country", "USA"))
+
+	return &browserk.HTMLFormElement{
+		FormType: browserk.FormAddress,
+		Events:   nil,
+		Attributes: map[string]string{
+			"action": "/addAddress",
+		},
+		Hidden:        false,
+		NodeDepth:     3,
+		ChildElements: children,
+		ID:            nil,
+	}
+}
+
+func MakeMockInput(inputType, name, placeholder string) *browserk.HTMLElement {
+	return &browserk.HTMLElement{
+		Type:          browserk.INPUT,
+		CustomTagName: "",
+		Events:        nil,
+		Attributes: map[string]string{
+			"name":        name,
+			"id":          name,
+			"type":        inputType,
+			"placeholder": placeholder,
+		},
+		Hidden:    false,
+		NodeDepth: 0,
+		ID:        nil,
+		Value:     "",
+	}
+}
+
+func MakeMockLabel(forElement, text string) *browserk.HTMLElement {
+	return &browserk.HTMLElement{
+		Type:          browserk.LABEL,
+		CustomTagName: "",
+		Events:        nil,
+		Attributes: map[string]string{
+			"for": forElement,
+		},
+		InnerText: text,
+		Hidden:    false,
+		NodeDepth: 0,
+		ID:        nil,
+		Value:     "",
+	}
+}
+
 func MakeMockMessages() []*browserk.HTTPMessage {
 	m := make([]*browserk.HTTPMessage, 0)
 	for i := 0; i < 3; i++ {

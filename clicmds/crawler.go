@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -18,6 +19,46 @@ import (
 	"gitlab.com/browserker/scanner"
 	"gitlab.com/browserker/store"
 )
+
+var defaultFormValues = browserk.FormData{
+	UserName:          "testuser",
+	Password:          "testP@assw0rd1",
+	FirstName:         "Test",
+	MiddleInitial:     "V",
+	MiddleName:        "Vuln",
+	LastName:          "User",
+	FullName:          "Test User",
+	Address:           "99 W. 3rd Street",
+	AddressLine1:      "Apt B",
+	AddressLine2:      "",
+	AddressLineExtra:  "",
+	StatePrefecture:   "CA",
+	Country:           "USA",
+	ZipCode:           "90210",
+	City:              "Beverly Hills",
+	NameOnCard:        "Test User",
+	CardNumber:        "4242424242424242",
+	CardCVC:           "434",
+	ExpirationMonth:   "12",
+	ExpirationYear:    "2022",
+	Email:             "testuser@test.com",
+	PhoneNumber:       "5055151",
+	CountryCode:       "+1",
+	AreaCode:          "555",
+	Extension:         "9024",
+	PassportNumber:    "20942422424",
+	TravelOrigin:      "NRT",
+	TravelDestination: "GCM",
+	Default:           "browserker",
+	SearchTerm:        "browserker",
+	CommentTitle:      "browserker",
+	CommentText:       "why yes indeed",
+	DocumentName:      "file.txt",
+	URL:               "https://example.com/browserker",
+	Network:           "192.168.1.1",
+	IPV4:              "192.168.1.20",
+	IPV6:              "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+}
 
 func CrawlerFlags() []cli.Flag {
 	return []cli.Flag{
@@ -63,6 +104,8 @@ func Crawler(ctx *cli.Context) error {
 	}
 
 	cfg := &browserk.Config{}
+	cfg.FormData = &defaultFormValues
+
 	if ctx.String("config") == "" {
 		cfg = &browserk.Config{
 			URL:         ctx.String("url"),
@@ -74,7 +117,11 @@ func Crawler(ctx *cli.Context) error {
 		if err != nil {
 			return err
 		}
-		toml.Unmarshal(data, cfg)
+
+		if err := toml.NewDecoder(strings.NewReader(string(data))).Decode(cfg); err != nil {
+			return err
+		}
+
 		if cfg.URL == "" && ctx.String("url") != "" {
 			cfg.URL = ctx.String("url")
 		}
@@ -82,7 +129,6 @@ func Crawler(ctx *cli.Context) error {
 			cfg.DataPath = ctx.String("datadir")
 		}
 	}
-
 	os.RemoveAll(cfg.DataPath)
 	crawl := store.NewCrawlGraph(cfg.DataPath + "/crawl")
 	attack := store.NewAttackGraph(cfg.DataPath + "/attack")

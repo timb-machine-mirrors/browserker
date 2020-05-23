@@ -1,6 +1,7 @@
 package browserk
 
 import (
+	"bytes"
 	"crypto/md5"
 	"sort"
 	"strings"
@@ -9,6 +10,7 @@ import (
 type ActHTMLElement interface {
 	Tag() string
 	ElementType() HTMLElementType
+	GetAttribute(name string) string
 	Depth() int
 	Hash() []byte
 }
@@ -56,6 +58,14 @@ func (h *HTMLElement) Tag() string {
 
 func (h *HTMLElement) Depth() int {
 	return h.NodeDepth
+}
+
+func (h *HTMLElement) GetAttribute(name string) string {
+	val, exist := h.Attributes[name]
+	if !exist {
+		return ""
+	}
+	return val
 }
 
 // FormType determine what type of form it is
@@ -110,6 +120,14 @@ func (h *HTMLFormElement) Hash() []byte {
 	return h.ID
 }
 
+func (h *HTMLFormElement) GetAttribute(name string) string {
+	val, exist := h.Attributes[name]
+	if !exist {
+		return ""
+	}
+	return val
+}
+
 func (h *HTMLFormElement) ElementType() HTMLElementType {
 	return FORM
 }
@@ -120,6 +138,37 @@ func (h *HTMLFormElement) Tag() string {
 
 func (h *HTMLFormElement) Depth() int {
 	return h.NodeDepth
+}
+
+func (h *HTMLFormElement) GetNextInput(start int) *HTMLElement {
+	if start > len(h.ChildElements)-1 {
+		return nil
+	}
+
+	for i := start; i < len(h.ChildElements); i++ {
+		if h.ChildElements[i].Type == INPUT {
+			return h.ChildElements[i]
+		}
+	}
+	return nil
+}
+
+func (h *HTMLFormElement) GetChildByNameOrID(name string) *HTMLElement {
+	for _, ele := range h.ChildElements {
+		if ele.GetAttribute("name") == name || ele.GetAttribute("id") == name {
+			return ele
+		}
+	}
+	return nil
+}
+
+func (h *HTMLFormElement) GetChildByHash(hash []byte) *HTMLElement {
+	for _, ele := range h.ChildElements {
+		if bytes.Compare(hash, ele.Hash()) == 0 {
+			return ele
+		}
+	}
+	return nil
 }
 
 // ImportantAttributeValues extracts the values for important attributes depending on HTMLElementType
@@ -140,7 +189,7 @@ func ImportantAttributeValues(elementType HTMLElementType, attrs map[string]stri
 			}
 		case INPUT:
 			switch k {
-			case "placeholder", "aria-label", "type":
+			case "placeholder", "aria-label", "type", "name", "id":
 				vals = append(vals, v)
 			}
 		case LABEL:
@@ -166,10 +215,12 @@ func ImportantAttributeValues(elementType HTMLElementType, attrs map[string]stri
 		}
 	}
 	// always add class if it exists need to becareful for state switches (class = disabled etc)
+	// and also potential for dynamic fields (maybe test if dynamic before adding?)
 	// TODO: strip out disabled/other keywords
 	if class, ok := attrs["class"]; ok {
 		vals = append(vals, class)
 	}
+
 	return vals
 }
 

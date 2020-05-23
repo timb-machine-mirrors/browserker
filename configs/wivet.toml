@@ -4,3 +4,6 @@ ExcludedURIs = ["/logout.php"]
 DataPath = "browserktmp"
 NumBrowsers = 5
 MaxDepth = 3
+
+[FormData]
+UserName  = "testuser1"
