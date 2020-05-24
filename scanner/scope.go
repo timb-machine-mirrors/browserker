@@ -22,13 +22,15 @@ type ScopeService struct {
 // NewScopeService set the target url for easier matching
 // TODO: allow ports as well
 func NewScopeService(target *url.URL) *ScopeService {
-	return &ScopeService{
+	s := &ScopeService{
 		target:       target,
 		allowed:      make([]string, 0),
 		ignored:      make([]string, 0),
 		excluded:     make([]string, 0),
 		excludedURIs: make([]string, 0),
 	}
+	s.AddScope([]string{target.Hostname()}, browserk.InScope)
+	return s
 }
 
 // AddScope to the scope service
@@ -96,7 +98,6 @@ func (s *ScopeService) Check(uri string) browserk.Scope {
 // ResolveBaseHref for html document links
 func (s *ScopeService) ResolveBaseHref(baseHref, candidate string) browserk.Scope {
 	var scope browserk.Scope
-
 	if strings.HasPrefix(candidate, "http") {
 		scope = s.Check(candidate)
 	} else {

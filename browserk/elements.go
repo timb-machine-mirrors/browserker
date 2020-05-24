@@ -90,13 +90,14 @@ const (
 
 // HTMLFormElement and it's children
 type HTMLFormElement struct {
-	FormType      FormType
-	Events        []HTMLEventType
-	Attributes    map[string]string
-	Hidden        bool
-	NodeDepth     int
-	ChildElements []*HTMLElement // capture all children (labels etc) so we can do context analysis
-	ID            []byte
+	FormType       FormType
+	Events         []HTMLEventType
+	Attributes     map[string]string
+	Hidden         bool
+	NodeDepth      int
+	ChildElements  []*HTMLElement // capture all children (labels etc) so we can do context analysis
+	ID             []byte
+	SubmitButtonID []byte
 }
 
 // Hash the form and it's input elements to (hopefully) a unique value
@@ -108,12 +109,15 @@ func (h *HTMLFormElement) Hash() []byte {
 	hash := md5.New()
 
 	vals := ImportantAttributeValues(FORM, h.Attributes)
-	for _, child := range h.ChildElements {
-		if child.Type != INPUT {
-			continue
+	/*
+		adds too much variabliity possibly...
+		for _, child := range h.ChildElements {
+			if child.Type != INPUT {
+				continue
+			}
+			vals = append(vals, ImportantAttributeValues(INPUT, child.Attributes)...)
 		}
-		vals = append(vals, ImportantAttributeValues(INPUT, child.Attributes)...)
-	}
+	*/
 	sorted := strings.Join(sort.StringSlice(vals), "")
 	hash.Write([]byte(sorted))
 	h.ID = hash.Sum(nil)
@@ -184,7 +188,7 @@ func ImportantAttributeValues(elementType HTMLElementType, attrs map[string]stri
 			}
 		case FORM:
 			switch k {
-			case "action", "method":
+			case "action", "method", "accept-charset", "autocomplete", "enctype", "target":
 				vals = append(vals, v)
 			}
 		case INPUT:

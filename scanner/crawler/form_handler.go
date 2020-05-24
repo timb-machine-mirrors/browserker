@@ -11,16 +11,20 @@ import (
 	"gitlab.com/browserker/browserk"
 )
 
+// CrawlerFormHandler handles filling forms
 type CrawlerFormHandler struct {
 	formData *browserk.FormData
 }
 
+// NewCrawlerFormHandler will fill forms based on the provided formData and determining
+// context for each form input
 func NewCrawlerFormHandler(formData *browserk.FormData) *CrawlerFormHandler {
 	return &CrawlerFormHandler{formData: formData}
 }
 
 // Init the form filler
-func Init() error {
+// TODO: validate form data isn't empty etc
+func (c *CrawlerFormHandler) Init() error {
 	return nil
 }
 
@@ -93,6 +97,7 @@ func (c *CrawlerFormHandler) Fill(form *browserk.HTMLFormElement) {
 		ele.Value = c.GetSuggestedInput(input)
 		log.Info().Msgf("suggested %s for ele %s", ele.Value, ele.GetAttribute("name"))
 	}
+	form.SubmitButtonID = formContext.Submit
 	return
 }
 

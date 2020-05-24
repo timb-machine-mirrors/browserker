@@ -21,6 +21,7 @@ type Browserk struct {
 	crawlGraph   browserk.CrawlGrapher
 	reporter     browserk.Reporter
 	browsers     browserk.BrowserPool
+	formHandler  browserk.FormHandler
 	navCh        chan []*browserk.Navigation
 	readyCh      chan struct{}
 	stateMonitor *time.Ticker
@@ -70,6 +71,8 @@ func (b *Browserk) Init(ctx context.Context) error {
 		return err
 	}
 
+	b.formHandler = crawler.NewCrawlerFormHandler(b.cfg.FormData)
+
 	b.initNavigation()
 
 	b.stateMonitor = time.NewTicker(time.Second * 10)
@@ -109,10 +112,6 @@ func (b *Browserk) scopeService(target *url.URL) browserk.ScopeService {
 	allowed := b.cfg.AllowedHosts
 	ignored := b.cfg.IgnoredHosts
 	excluded := b.cfg.ExcludedHosts
-
-	if allowed == nil {
-		allowed = []string{target.Hostname()}
-	}
 
 	scope := NewScopeService(target)
 	scope.AddScope(allowed, browserk.InScope)

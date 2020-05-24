@@ -125,6 +125,7 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 		}
 		err = ele.Click()
 	case browserk.ActFillForm:
+		log.Info().Msg("fill form action executing...")
 		t.FillForm(act)
 	case browserk.ActLeftClickDown:
 	case browserk.ActLeftClickUp:
@@ -167,35 +168,47 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 // FillForm for an action
 // TODO: handle checkbox, radio, selects etc
 func (t *Tab) FillForm(act *browserk.Action) error {
+	log.Info().Msg("filling form")
 	if act.Form == nil {
+		log.Info().Msg("form was nil")
 		return &ErrInvalidElement{}
 	}
 	form, err := t.FindByHTMLElement(act.Form)
 	if err != nil {
+		log.Error().Err(err).Msg("find form by html element failed")
 		return err
 	}
+	log.Info().Msgf("found form we have %d child elements", len(act.Form.ChildElements))
+	form.ScrollTo()
+	var submitButton *Element
+	for _, formChild := range act.Form.ChildElements {
+		//if htmlElement.Type != browserk.INPUT && htmlElement.Type != browserk.BUTTON {
+		//	log.Debug().Msgf("SKIPPING ELEMENT %s", browserk.HTMLTypeToStrMap[htmlElement.Type])
+		//	continue
+		//}
 
-	form.Focus()
-
-	submitButton := &Element{}
-	for _, htmlElement := range act.Form.ChildElements {
-		ele, err := t.FindByHTMLElement(htmlElement)
+		actualElement, err := t.FindByHTMLElement(formChild)
 		if err != nil {
-			return &ErrElementNotFound{}
+			log.Error().Err(err).Str("type", browserk.HTMLTypeToStrMap[formChild.Type]).Msg("failed to find")
+			continue
 		}
-		switch htmlElement.Type {
-		case browserk.BUTTON:
-			submitButton = ele
-		case browserk.INPUT:
-			if htmlElement.Attributes["type"] == "submit" {
-				submitButton = ele
-				continue
+
+		if formChild.Type == browserk.INPUT && formChild.Value != "" {
+			actualElement.Focus()
+			if err := actualElement.SendKeys(formChild.Value); err != nil {
+				log.Error().Err(err).Msg("failed to send keys")
 			}
-			ele.Focus()
-			ele.SendKeys(act.Element.Value)
+		}
+		log.Debug().Msgf("[%s] comparing %s ~ %s", browserk.HTMLTypeToStrMap[formChild.Type], string(formChild.Hash()), string(act.Form.SubmitButtonID))
+		if bytes.Compare(formChild.Hash(), act.Form.SubmitButtonID) == 0 {
+			log.Info().Msgf("found submit button %#v", act.Form)
+			submitButton = actualElement
 		}
 	}
-
+	if submitButton == nil {
+		return &ErrElementNotFound{}
+	}
+	log.Info().Msgf("Submitting form... %s", submitButton.String())
 	return submitButton.Click()
 }
 
@@ -242,22 +255,33 @@ func (t *Tab) ID() int64 {
 }
 
 // FindByHTMLElement returns a gcd Element for interacting
-func (t *Tab) FindByHTMLElement(ele browserk.ActHTMLElement) (*Element, error) {
-	if ele == nil {
+func (t *Tab) FindByHTMLElement(toFind browserk.ActHTMLElement) (*Element, error) {
+	if toFind == nil {
 		return nil, &ErrInvalidElement{}
 	}
-	tag := ele.Tag()
-
-	eles, err := t.GetElementsBySelector(tag)
+	tag := toFind.Tag()
+	log.Info().Msgf("searching for tag: %s", tag)
+	foundElements, err := t.GetElementsBySelector(tag)
 	if err != nil {
+		log.Error().Err(err).Msgf("searching for tag: %s failed", tag)
 		return nil, err
 	}
 
-	for _, found := range eles {
-		h := ElementToHTMLElement(found)
-		if bytes.Compare(h.Hash(), ele.Hash()) == 0 && h.NodeDepth == ele.Depth() {
-			log.Info().Msg("found by nearly exact match")
-			return found, nil
+	if toFind.ElementType() == browserk.FORM {
+		for _, found := range foundElements {
+			f := ElementToHTMLFormElement(found)
+			log.Debug().Msgf("comparing elements.. %s ~ %s", string(f.Hash()), string(toFind.Hash()))
+			if bytes.Compare(f.Hash(), toFind.Hash()) == 0 {
+				return found, nil
+			}
+		}
+	} else {
+		for _, found := range foundElements {
+			h := ElementToHTMLElement(found)
+			if bytes.Compare(h.Hash(), toFind.Hash()) == 0 && h.NodeDepth == toFind.Depth() {
+				log.Info().Msg("found by nearly exact match")
+				return found, nil
+			}
 		}
 	}
 	return nil, &ErrElementNotFound{}
@@ -294,10 +318,7 @@ func (t *Tab) FindForms() ([]*browserk.HTMLFormElement, error) {
 	}
 
 	for _, form := range elements {
-		f := &browserk.HTMLFormElement{
-			Events:        make([]browserk.HTMLEventType, 0),
-			ChildElements: make([]*browserk.HTMLElement, 0),
-		}
+		f := ElementToHTMLFormElement(form)
 
 		childNodes, _ := form.GetChildNodeIds()
 		for _, childID := range childNodes {
@@ -705,9 +726,11 @@ func (t *Tab) getDocumentElementByID(docNodeID int, attributeID string) (*Elemen
 // GetElementsBySelector all elements that match a selector from the top level document
 // also searches sub frames
 func (t *Tab) GetElementsBySelector(selector string) ([]*Element, error) {
+	log.Debug().Msgf("searching for %s", selector)
 	elements, err := t.GetDocumentElementsBySelector(t.getTopNodeID(), selector)
 	if err != nil {
 		// try again but refresh the doc
+		log.Debug().Msg("failed to find element, refreshing document and trying again")
 		t.RefreshDocument()
 		elements, err = t.GetDocumentElementsBySelector(t.getTopNodeID(), selector)
 		if err != nil {

@@ -38,6 +38,24 @@ func ElementToHTMLElement(ele *Element) *browserk.HTMLElement {
 	return b
 }
 
+func ElementToHTMLFormElement(ele *Element) *browserk.HTMLFormElement {
+	b := &browserk.HTMLFormElement{Events: make([]browserk.HTMLEventType, 0)}
+	b.Attributes, _ = ele.GetAttributes()
+	b.NodeDepth = ele.Depth()
+	listeners, err := ele.GetEventListeners()
+	if err == nil {
+		for _, listener := range listeners {
+			eventType, ok := browserk.HTMLEventTypeMap[listener.Type]
+			if !ok {
+				eventType = browserk.HTMLEventcustom
+			}
+			b.Events = append(b.Events, eventType)
+		}
+	}
+
+	return b
+}
+
 // GCDRequestToBrowserk NetworkRequestWillBeSentEvent -> HTTPRequest
 func GCDRequestToBrowserk(req *gcdapi.NetworkRequestWillBeSentEvent) *browserk.HTTPRequest {
 	p := req.Params

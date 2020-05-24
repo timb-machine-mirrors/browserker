@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
 )
@@ -137,13 +138,14 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 	}
 
 	for _, form := range formElements {
-		scope := bctx.Scope.ResolveBaseHref(baseHref, form.Attributes["action"])
+		spew.Dump(baseHref)
+		scope := bctx.Scope.ResolveBaseHref(baseHref, form.GetAttribute("action"))
 		if scope == browserk.InScope && !diff.Has(browserk.FORM, form.Hash()) {
 			nav := browserk.NewNavigationFromForm(entry, browserk.TrigCrawler, form)
 			bctx.FormHandler.Fill(form)
 			navs = append(navs, nav)
 		} else {
-			log.Debug().Str("href", baseHref).Str("action", form.Attributes["action"]).Msg("was out of scope or already found, not creating new nav")
+			log.Debug().Str("href", baseHref).Str("action", form.GetAttribute("action")).Msg("was out of scope or already found, not creating new nav")
 		}
 	}
 
@@ -170,7 +172,7 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 
 	log.Debug().Int("link_count", len(aElements)).Msg("found links")
 	for _, a := range aElements {
-		scope := bctx.Scope.ResolveBaseHref(baseHref, a.Attributes["href"])
+		scope := bctx.Scope.ResolveBaseHref(baseHref, a.GetAttribute("href"))
 
 		if scope == browserk.InScope && !diff.Has(browserk.A, a.Hash()) {
 			log.Info().Str("href", a.Attributes["href"]).Msg("in scope, adding")
@@ -178,7 +180,7 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 			nav.Scope = scope
 			navs = append(navs, nav)
 		} else {
-			log.Debug().Str("baseHref", baseHref).Str("linkHref", a.Attributes["href"]).Msg("was out of scope, not creating new nav")
+			log.Debug().Str("baseHref", baseHref).Str("linkHref", a.GetAttribute("href")).Msg("was out of scope, not creating new nav")
 		}
 	}
 

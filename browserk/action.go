@@ -65,3 +65,10 @@ type Action struct {
 	Form    *HTMLFormElement `graph:"form"`
 	Result  []byte           `graph:"result"`
 }
+
+func NewLoadURLAction(url string) *Action {
+	return &Action{
+		Type:  ActLoadURL,
+		Input: []byte(url),
+	}
+}
