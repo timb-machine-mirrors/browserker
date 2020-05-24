@@ -52,6 +52,7 @@ func (b *Browserk) Init(ctx context.Context) error {
 		CtxComplete: cancelFn,
 		Auth:        auth.New(b.cfg),
 		Scope:       b.scopeService(target),
+		FormHandler: crawler.NewCrawlerFormHandler(b.cfg.FormData),
 		Reporter:    b.reporter,
 		Injector:    nil,
 		Crawl:       b.crawlGraph,

@@ -262,7 +262,6 @@ func (t *Tab) FindByHTMLElement(toFind browserk.ActHTMLElement) (*Element, error
 		return nil, &ErrInvalidElement{}
 	}
 	tag := toFind.Tag()
-	log.Info().Msgf("searching for tag: %s", tag)
 	foundElements, err := t.GetElementsBySelector(tag)
 	if err != nil {
 		log.Error().Err(err).Msgf("searching for tag: %s failed", tag)
@@ -272,7 +271,6 @@ func (t *Tab) FindByHTMLElement(toFind browserk.ActHTMLElement) (*Element, error
 	if toFind.ElementType() == browserk.FORM {
 		for _, found := range foundElements {
 			f := ElementToHTMLFormElement(found)
-			log.Debug().Msgf("comparing elements.. %s ~ %s", string(f.Hash()), string(toFind.Hash()))
 			if bytes.Compare(f.Hash(), toFind.Hash()) == 0 {
 				return found, nil
 			}
