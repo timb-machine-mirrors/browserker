@@ -59,7 +59,13 @@ func TestCrawler(t *testing.T) {
 
 	called := false
 	formHandler := func(c *gin.Context) {
-		called = true
+		fname, _ := c.GetQuery("fname")
+		lname, _ := c.GetQuery("lname")
+
+		if fname == "Test" && lname == "User" {
+			called = true
+		}
+
 		resp := "<html><body>You made it!</body></html>"
 		c.Writer.WriteHeader(http.StatusOK)
 		c.Writer.Write([]byte(resp))
@@ -86,6 +92,7 @@ func TestCrawler(t *testing.T) {
 	if len(newNavs) != 1 {
 		t.Fatal("did not find form nav action")
 	}
+
 	_, _, err = crawl.Process(bCtx, b, newNavs[0], true)
 	if err != nil {
 		t.Fatalf("failed to submit form %s\n", err)

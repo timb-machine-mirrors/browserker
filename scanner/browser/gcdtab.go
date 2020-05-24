@@ -178,8 +178,10 @@ func (t *Tab) FillForm(act *browserk.Action) error {
 		log.Error().Err(err).Msg("find form by html element failed")
 		return err
 	}
+
 	log.Info().Msgf("found form we have %d child elements", len(act.Form.ChildElements))
 	form.ScrollTo()
+
 	var submitButton *Element
 	for _, formChild := range act.Form.ChildElements {
 		//if htmlElement.Type != browserk.INPUT && htmlElement.Type != browserk.BUTTON {
@@ -199,7 +201,7 @@ func (t *Tab) FillForm(act *browserk.Action) error {
 				log.Error().Err(err).Msg("failed to send keys")
 			}
 		}
-		log.Debug().Msgf("[%s] comparing %s ~ %s", browserk.HTMLTypeToStrMap[formChild.Type], string(formChild.Hash()), string(act.Form.SubmitButtonID))
+		//log.Debug().Msgf("[%s] comparing %s ~ %s", browserk.HTMLTypeToStrMap[formChild.Type], string(formChild.Hash()), string(act.Form.SubmitButtonID))
 		if bytes.Compare(formChild.Hash(), act.Form.SubmitButtonID) == 0 {
 			log.Info().Msgf("found submit button %#v", act.Form)
 			submitButton = actualElement
@@ -278,6 +280,7 @@ func (t *Tab) FindByHTMLElement(toFind browserk.ActHTMLElement) (*Element, error
 	} else {
 		for _, found := range foundElements {
 			h := ElementToHTMLElement(found)
+			log.Debug().Msgf("[%s] comparing %s ~ %s (%#v) vs (%#v)", browserk.HTMLTypeToStrMap[h.Type], string(h.Hash()), string(toFind.Hash()), h.Attributes, toFind.AllAttributes())
 			if bytes.Compare(h.Hash(), toFind.Hash()) == 0 && h.NodeDepth == toFind.Depth() {
 				log.Info().Msg("found by nearly exact match")
 				return found, nil

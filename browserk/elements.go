@@ -11,6 +11,7 @@ type ActHTMLElement interface {
 	Tag() string
 	ElementType() HTMLElementType
 	GetAttribute(name string) string
+	AllAttributes() map[string]string
 	Depth() int
 	Hash() []byte
 }
@@ -38,7 +39,8 @@ func (h *HTMLElement) Hash() []byte {
 	hash := md5.New()
 	vals := ImportantAttributeValues(h.Type, h.Attributes)
 	vals = append(vals, h.InnerText)
-	sorted := strings.Join(sort.StringSlice(vals), "")
+	sort.StringSlice(vals).Sort()
+	sorted := strings.Join(vals, "")
 	hash.Write([]byte(sorted))
 	h.ID = hash.Sum(nil)
 	return h.ID
@@ -66,6 +68,10 @@ func (h *HTMLElement) GetAttribute(name string) string {
 		return ""
 	}
 	return val
+}
+
+func (h *HTMLElement) AllAttributes() map[string]string {
+	return h.Attributes
 }
 
 // FormType determine what type of form it is
@@ -118,7 +124,8 @@ func (h *HTMLFormElement) Hash() []byte {
 			vals = append(vals, ImportantAttributeValues(INPUT, child.Attributes)...)
 		}
 	*/
-	sorted := strings.Join(sort.StringSlice(vals), "")
+	sort.StringSlice(vals).Sort()
+	sorted := strings.Join(vals, "")
 	hash.Write([]byte(sorted))
 	h.ID = hash.Sum(nil)
 	return h.ID
@@ -130,6 +137,10 @@ func (h *HTMLFormElement) GetAttribute(name string) string {
 		return ""
 	}
 	return val
+}
+
+func (h *HTMLFormElement) AllAttributes() map[string]string {
+	return h.Attributes
 }
 
 func (h *HTMLFormElement) ElementType() HTMLElementType {
