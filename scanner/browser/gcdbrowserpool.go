@@ -44,8 +44,6 @@ var startupFlags = []string{
 
 	"--password-store=basic",
 	//"--proxy-server=localhost:8080",
-	// TODO: re-investigate headless periodically, currently intercepting TLS requests and replacing
-	// hostnames with ip addresses fails.
 	"--headless",
 	"about:blank",
 }

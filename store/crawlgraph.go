@@ -172,6 +172,7 @@ func (g *CrawlGraph) GetNavigation(id []byte) (*browserk.Navigation, error) {
 // For the original navigation ID we want to store:
 // r_nav_id:<nav id> = result.ID so we can GetNavigationResult(nav_id) to get
 // the node ID for this result then look up <predicate>:resultID = ... values ...
+// set the nav state to visited
 func (g *CrawlGraph) AddResult(result *browserk.NavigationResult) error {
 
 	return g.GraphStore.Update(func(txn *badger.Txn) error {
@@ -194,7 +195,11 @@ func (g *CrawlGraph) AddResult(result *browserk.NavigationResult) error {
 			// key = <id>:<predicate>, value = msgpack'd bytes
 			txn.Set(key, bytez)
 		}
-		return nil
+		// set the navigation id to visited
+		// TODO: track failures
+		navIDkey := MakeKey(result.NavigationID, "state")
+		value, _ := EncodeState(browserk.NavVisited)
+		return txn.Set(navIDkey, value)
 	})
 }
 

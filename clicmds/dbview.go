@@ -57,17 +57,17 @@ func DBView(ctx *cli.Context) error {
 				}
 			}
 		}
-		entries := crawl.Find(nil, browserk.NavInProcess, browserk.NavInProcess, 999)
+		entries := crawl.Find(nil, browserk.NavVisited, browserk.NavVisited, 999)
 		fmt.Printf("Had %d entries\n", len(entries))
 
 		for _, paths := range entries {
 			fmt.Printf("Path: \n")
 			for i, path := range paths {
 				if len(paths)-1 == i {
-					fmt.Printf("%s %s\n", browserk.ActionTypeMap[path.Action.Type], printActionDetails(path.Action))
+					fmt.Printf("%s %s\n", browserk.ActionTypeMap[path.Action.Type], path.Action)
 					break
 				}
-				fmt.Printf("%s %s -> ", browserk.ActionTypeMap[path.Action.Type], printActionDetails(path.Action))
+				fmt.Printf("%s %s -> ", browserk.ActionTypeMap[path.Action.Type], path.Action)
 
 			}
 		}
@@ -76,25 +76,4 @@ func DBView(ctx *cli.Context) error {
 	err := crawl.Close()
 	time.Sleep(5 * time.Second)
 	return err
-}
-
-func printActionDetails(act *browserk.Action) string {
-	ret := ""
-	switch act.Type {
-	case browserk.ActLoadURL:
-		ret += "[" + string(act.Input) + "]"
-	case browserk.ActLeftClick:
-		ret += "[" + browserk.HTMLTypeToStrMap[act.Element.Type] + " "
-		for k, v := range act.Element.Attributes {
-			ret += k + "=" + v
-		}
-		ret += "]"
-	case browserk.ActFillForm:
-		ret += "[ FORM "
-		for k, v := range act.Form.Attributes {
-			ret += k + "=" + v
-		}
-		ret += "]"
-	}
-	return ret
 }

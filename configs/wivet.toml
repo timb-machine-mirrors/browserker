@@ -3,7 +3,7 @@ AllowedHosts = ["localhost"]
 ExcludedURIs = ["/logout.php"]
 DataPath = "browserktmp"
 NumBrowsers = 5
-MaxDepth = 3
+MaxDepth = 25
 
 [FormData]
 UserName  = "testuser1"

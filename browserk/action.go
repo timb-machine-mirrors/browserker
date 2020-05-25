@@ -72,3 +72,24 @@ func NewLoadURLAction(url string) *Action {
 		Input: []byte(url),
 	}
 }
+
+func (a *Action) String() string {
+	ret := ""
+	switch a.Type {
+	case ActLoadURL:
+		ret += "[" + string(a.Input) + "]"
+	case ActLeftClick:
+		ret += "[" + HTMLTypeToStrMap[a.Element.Type] + " "
+		for k, v := range a.Element.Attributes {
+			ret += k + "=" + v
+		}
+		ret += "]"
+	case ActFillForm:
+		ret += "[ FORM "
+		for k, v := range a.Form.Attributes {
+			ret += k + "=" + v
+		}
+		ret += "]"
+	}
+	return ret
+}

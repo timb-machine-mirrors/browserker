@@ -2,9 +2,11 @@ package scanner
 
 import (
 	"context"
+	"fmt"
 	"net/url"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	"gitlab.com/browserker/browserk"
@@ -186,10 +188,14 @@ func (b *Browserk) crawl(navs []*browserk.Navigation) {
 
 		ctx, cancel := context.WithTimeout(navCtx.Ctx, time.Second*45)
 		navCtx.Ctx = ctx
-		navCtx.Log = log.With().
+		logger := log.With().
 			Int64("browser_id", browser.ID()).
 			Logger()
+		navCtx.Log = &logger
+
 		defer cancel()
+
+		b.printActionStep(navCtx.Log, navs, i)
 
 		result, newNavs, err := crawler.Process(navCtx, browser, nav, isFinal)
 		if err != nil {
@@ -212,6 +218,18 @@ func (b *Browserk) crawl(navs []*browserk.Navigation) {
 	browser.Close()
 	b.browsers.Return(navCtx.Ctx, port)
 	b.readyCh <- struct{}{}
+}
+
+func (b *Browserk) printActionStep(logger *zerolog.Logger, navs []*browserk.Navigation, current int) {
+	pathString := ""
+	for i, path := range navs {
+		if len(navs)-1 == i {
+			pathString += fmt.Sprintf("%s %s", browserk.ActionTypeMap[path.Action.Type], path.Action)
+			break
+		}
+		pathString += fmt.Sprintf("%s %s -> ", browserk.ActionTypeMap[path.Action.Type], path.Action)
+	}
+	logger.Info().Str("path", pathString).Int("step", current).Msg("Executing action")
 }
 
 // Stop the browsers

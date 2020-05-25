@@ -177,9 +177,9 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 			nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, a, browserk.ActLeftClick)
 			nav.Scope = scope
 			navs = append(navs, nav)
-		} else {
+		} /* else {
 			bctx.Log.Debug().Str("baseHref", baseHref).Str("linkHref", a.GetAttribute("href")).Msg("was out of scope, not creating new nav")
-		}
+		}*/
 	}
 
 	// todo pull out additional clickable/whateverable elements
