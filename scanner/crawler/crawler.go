@@ -192,9 +192,11 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 	if err == nil {
 		for _, ele := range cElements {
 			// assume in scope for now
-			nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, ele, browserk.ActLeftClick)
-			nav.Scope = browserk.InScope
-			navs = append(navs, nav)
+			if !diff.Has(ele.Type, ele.Hash()) {
+				nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, ele, browserk.ActLeftClick)
+				nav.Scope = browserk.InScope
+				navs = append(navs, nav)
+			}
 		}
 	}
 	// todo pull out additional clickable/whateverable elements
