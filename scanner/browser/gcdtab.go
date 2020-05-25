@@ -301,6 +301,24 @@ func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error
 	return bElements, nil
 }
 
+func (t *Tab) FindClickables() ([]*browserk.HTMLElement, error) {
+	cElements := make([]*browserk.HTMLElement, 0)
+	allElements := t.GetAllElements()
+
+	for _, ele := range allElements {
+		listeners, err := ele.GetEventListeners()
+		if err != nil {
+			continue
+		}
+		for _, evt := range listeners {
+			if evt.Type == "click" {
+				cElements = append(cElements, ElementToHTMLElement(ele))
+			}
+		}
+	}
+	return cElements, nil
+}
+
 // GetBaseHref of the top level document
 // TODO will need to handle iframes here too
 func (t *Tab) GetBaseHref() string {

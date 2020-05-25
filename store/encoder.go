@@ -6,7 +6,6 @@ import (
 	"time"
 
 	badger "github.com/dgraph-io/badger/v2"
-	"github.com/rs/zerolog/log"
 	"github.com/vmihailenco/msgpack/v4"
 	"gitlab.com/browserker/browserk"
 )
@@ -97,7 +96,6 @@ func DecodeNavigationResult(txn *badger.Txn, predicates []*NavGraphField, result
 	}
 
 	for _, pred := range fields {
-		log.Info().Msgf("looking up: %s", string(pred.key))
 		item, err := txn.Get(pred.key)
 		if err != nil {
 			return nil, err

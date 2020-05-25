@@ -121,6 +121,14 @@ func (b *BrowserkCrawler) snapshot(bctx *browserk.Context, browser browserk.Brow
 			}
 		}
 	}
+
+	cElements, err := browser.FindClickables()
+	if err == nil {
+		for _, ele := range cElements {
+			// assume in scope for now
+			diff.Add(ele.Type, ele.Hash())
+		}
+	}
 	return diff
 }
 
@@ -162,10 +170,8 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 	aElements, err := browser.FindElements("a")
 	if err != nil {
 		bctx.Log.Error().Err(err).Msg("error while extracting links")
-		return navs
 	} else if aElements == nil || len(aElements) == 0 {
 		log.Warn().Msg("error while extracting links")
-		return navs
 	}
 
 	bctx.Log.Debug().Int("link_count", len(aElements)).Msg("found links")
@@ -182,6 +188,15 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 		}*/
 	}
 
+	cElements, err := browser.FindClickables()
+	if err == nil {
+		for _, ele := range cElements {
+			// assume in scope for now
+			nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, ele, browserk.ActLeftClick)
+			nav.Scope = browserk.InScope
+			navs = append(navs, nav)
+		}
+	}
 	// todo pull out additional clickable/whateverable elements
 	return navs
 }

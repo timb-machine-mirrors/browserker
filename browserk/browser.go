@@ -28,6 +28,7 @@ type Browser interface {
 	Navigate(ctx context.Context, url string) (err error)
 	FindElements(querySelector string) ([]*HTMLElement, error)
 	FindForms() ([]*HTMLFormElement, error)
+	FindClickables() ([]*HTMLElement, error)
 	GetMessages() ([]*HTTPMessage, error)
 	Screenshot() (string, error)
 	RefreshDocument()                                                     // reloads the document/elements

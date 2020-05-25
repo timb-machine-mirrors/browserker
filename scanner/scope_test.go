@@ -58,6 +58,10 @@ func TestScope(t *testing.T) {
 			"http://bad.com/signout",
 			browserk.OutOfScope,
 		},
+		{
+			"",
+			browserk.InScope,
+		},
 	}
 	for _, in := range inputs {
 		ret := s.Check(in.in)
