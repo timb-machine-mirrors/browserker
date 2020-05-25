@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/rs/zerolog/log"
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
 	"gitlab.com/browserker/browserk"
@@ -54,14 +53,14 @@ func (t *Tab) subscribeLoadEvent() {
 
 func (t *Tab) subscribeFrameLoadingEvent() {
 	t.t.Subscribe("Page.frameStartedLoading", func(target *gcd.ChromeTarget, payload []byte) {
-		log.Info().Msg("frame loading")
+		t.log.Info().Msg("frame loading")
 		if t.IsNavigating() {
 			return
 		}
 		header := &gcdapi.PageFrameStartedLoadingEvent{}
 		err := json.Unmarshal(payload, header)
 		// has the top frame id begun navigating?
-		log.Info().Msgf("transitioning! %s vs top frame: %s", header.Params.FrameId, t.getTopFrameID())
+		t.log.Info().Msgf("transitioning! %s vs top frame: %s", header.Params.FrameId, t.getTopFrameID())
 		if err == nil && header.Params.FrameId == t.getTopFrameID() {
 			t.setIsTransitioning(true)
 		}
@@ -138,7 +137,7 @@ func (t *Tab) subscribeChildNodeCountUpdated() {
 }
 func (t *Tab) subscribeChildNodeInserted() {
 	t.t.Subscribe("DOM.childNodeInserted", func(target *gcd.ChromeTarget, payload []byte) {
-		//log.Printf("childNodeInserted: %s\n", string(payload))
+		//t.log.Printf("childNodeInserted: %s\n", string(payload))
 		header := &gcdapi.DOMChildNodeInsertedEvent{}
 		err := json.Unmarshal(payload, header)
 		if err == nil {
@@ -273,7 +272,7 @@ func (t *Tab) subscribeConsoleEvents() {
 // HOWEVER it does appear we can intercept them???
 func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 	t.t.Subscribe("network.loadingFailed", func(target *gcd.ChromeTarget, payload []byte) {
-		log.Info().Int64("browser_id", t.id).Msgf("failed: %s\n", string(payload))
+		t.log.Info().Msgf("failed: %s\n", string(payload))
 		t.container.DecRequest()
 	})
 
@@ -286,7 +285,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		req := GCDRequestToBrowserk(message)
 
 		if message.Params.Type == "Document" {
-			//log.Info().Str("request_id", message.Params.RequestId).Msg("is Document request")
+			//t.log.Info().Str("request_id", message.Params.RequestId).Msg("is Document request")
 			t.container.SetLoadRequest(req)
 		}
 		if message.Params.RedirectResponse != nil {
@@ -296,7 +295,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 			t.container.AddResponse(GCDResponseToBrowserk(fake, body))
 		}
 		t.container.AddRequest(req)
-		log.Debug().Int64("browser_id", t.id).Int32("pending", t.container.OpenRequestCount()).Str("url", message.Params.Request.Url).Str("request_id", message.Params.RequestId).Msg("added request")
+		t.log.Debug().Int32("pending", t.container.OpenRequestCount()).Str("url", message.Params.Request.Url).Str("request_id", message.Params.RequestId).Msg("added request")
 	})
 
 	t.t.Subscribe("Network.requestServedFromCache", func(target *gcd.ChromeTarget, payload []byte) {
@@ -304,7 +303,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		if err := json.Unmarshal(payload, message); err != nil {
 			return
 		}
-		//log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("served from cache")
+		//t.log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("served from cache")
 	})
 
 	t.t.Subscribe("Network.responseReceived", func(target *gcd.ChromeTarget, payload []byte) {
@@ -314,7 +313,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 			return
 		}
 		p := message.Params
-		//log.Info().Int32("pending", t.container.OpenRequestCount()).Str("url", p.Response.Url).Str("request_id", message.Params.RequestId).Msg("waiting")
+		//t.log.Info().Int32("pending", t.container.OpenRequestCount()).Str("url", p.Response.Url).Str("request_id", message.Params.RequestId).Msg("waiting")
 
 		timeoutCtx, cancel := context.WithTimeout(ctx.Ctx, time.Second*10)
 		defer cancel()
@@ -325,7 +324,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		}
 		bodyStr, encoded, err := t.t.Network.GetResponseBody(message.Params.RequestId)
 		if err != nil {
-			log.Warn().Int64("browser_id", t.id).Str("url", message.Params.Response.Url).Err(err).Msg("failed to get body")
+			t.log.Warn().Str("url", message.Params.Response.Url).Err(err).Msg("failed to get body")
 		}
 
 		body := []byte(bodyStr)
@@ -334,7 +333,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		}
 
 		t.container.AddResponse(GCDResponseToBrowserk(message, body))
-		log.Debug().Int64("browser_id", t.id).Int32("pending", t.container.OpenRequestCount()).Str("url", p.Response.Url).Str("request_id", message.Params.RequestId).Msg("added")
+		t.log.Debug().Int32("pending", t.container.OpenRequestCount()).Str("url", p.Response.Url).Str("request_id", message.Params.RequestId).Msg("added")
 	})
 
 	t.t.Subscribe("Network.loadingFinished", func(target *gcd.ChromeTarget, payload []byte) {
@@ -343,7 +342,7 @@ func (t *Tab) subscribeNetworkEvents(ctx *browserk.Context) {
 		if err := json.Unmarshal(payload, message); err != nil {
 			return
 		}
-		//log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("finished")
+		//t.log.Info().Int32("pending", t.container.OpenRequestCount()).Str("request_id", message.Params.RequestId).Msg("finished")
 		t.container.BodyReady(message.Params.RequestId)
 	})
 }
@@ -352,7 +351,7 @@ func (t *Tab) subscribeInterception(ctx *browserk.Context) {
 	t.t.Subscribe("Fetch.requestPaused", func(target *gcd.ChromeTarget, payload []byte) {
 		message := &gcdapi.FetchRequestPausedEvent{}
 		if err := json.Unmarshal(payload, message); err != nil {
-			log.Fatal().Err(err).Int64("browser_id", t.id).Msg("critical error Fetch.requestPaused event was unable to decode")
+			t.log.Fatal().Err(err).Msg("critical error Fetch.requestPaused event was unable to decode")
 		}
 
 		if message.Params.ResponseHeaders == nil {
@@ -406,7 +405,7 @@ func (t *Tab) interceptedResponse(ctx *browserk.Context, message *gcdapi.FetchRe
 
 	bodyStr, encoded, err := t.t.Fetch.GetResponseBody(p.RequestId)
 	if err != nil {
-		log.Warn().Err(err).Int64("browser_id", t.id).Str("request_id", p.RequestId).Msg("unable to get body")
+		t.log.Warn().Err(err).Str("request_id", p.RequestId).Msg("unable to get body")
 		//spew.Dump(p)
 		t.t.Fetch.ContinueRequestWithParams(&gcdapi.FetchContinueRequestParams{
 			RequestId: p.RequestId,

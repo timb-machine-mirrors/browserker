@@ -3,6 +3,8 @@ package browserk
 import (
 	"context"
 	"math"
+
+	"github.com/rs/zerolog"
 )
 
 // RequestHandler for adding middleware between browser HTTP Request events
@@ -22,6 +24,7 @@ const abortIndex int8 = math.MaxInt8 / 2
 // Context shared between services, browsers and plugins
 type Context struct {
 	Ctx         context.Context
+	Log         zerolog.Logger
 	CtxComplete func()
 	Auth        AuthService
 	Scope       ScopeService

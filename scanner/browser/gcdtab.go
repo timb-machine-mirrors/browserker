@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/rs/zerolog/log"
+	"github.com/rs/zerolog"
 	"gitlab.com/browserker/browserk"
 
 	"github.com/wirepair/gcd"
@@ -27,6 +27,7 @@ type Tab struct {
 	id        int64
 	eleMutex  *sync.RWMutex    // locks our elements when added/removed.
 	elements  map[int]*Element // our map of elements for this tab
+	log       zerolog.Logger
 
 	topNodeID             atomic.Value           // the nodeID of the current top level #document
 	topFrameID            atomic.Value           // the frameID of the current top level #document
@@ -54,11 +55,12 @@ type Tab struct {
 }
 
 // NewTab to use
-func NewTab(ctx *browserk.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Tab {
+func NewTab(bctx *browserk.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Tab {
 	id := rand.Int63() // TODO: generate random or something
 	t := &Tab{
 		t:            tab,
-		ctx:          ctx,
+		ctx:          bctx,
+		log:          bctx.Log,
 		container:    NewContainer(),
 		crashedCh:    make(chan string),
 		exitCh:       make(chan struct{}),
@@ -84,8 +86,8 @@ func NewTab(ctx *browserk.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *
 	t.domChangeHandler = nil
 	t.baseHref.Store("")
 	t.disconnectedHandler = t.defaultDisconnectedHandler
-	go t.listenDebuggerEvents(ctx)
-	t.subscribeBrowserEvents(ctx, true)
+	go t.listenDebuggerEvents(bctx)
+	t.subscribeBrowserEvents(bctx, true)
 	return t
 }
 
@@ -95,7 +97,7 @@ func (t *Tab) SetDisconnectedHandler(handlerFn TabDisconnectedHandler) {
 }
 
 func (t *Tab) defaultDisconnectedHandler(tab *Tab, reason string) {
-	log.Debug().Msgf("tab %s tabID: %s", reason, tab.t.Target.Id)
+	t.log.Debug().Msgf("tab %s tabID: %s", reason, tab.t.Target.Id)
 }
 
 // Close the exit channel
@@ -125,7 +127,7 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 		}
 		err = ele.Click()
 	case browserk.ActFillForm:
-		log.Info().Msg("fill form action executing...")
+		t.log.Info().Msg("fill form action executing...")
 		t.FillForm(act)
 	case browserk.ActLeftClickDown:
 	case browserk.ActLeftClickUp:
@@ -168,49 +170,45 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 // FillForm for an action
 // TODO: handle checkbox, radio, selects etc
 func (t *Tab) FillForm(act *browserk.Action) error {
-	log.Info().Msg("filling form")
+	t.log.Info().Msg("filling form")
 	if act.Form == nil {
-		log.Info().Msg("form was nil")
+		t.log.Info().Msg("form was nil")
 		return &ErrInvalidElement{}
 	}
 	form, err := t.FindByHTMLElement(act.Form)
 	if err != nil {
-		log.Error().Err(err).Msg("find form by html element failed")
+		t.log.Error().Err(err).Msg("find form by html element failed")
 		return err
 	}
 
-	log.Info().Msgf("found form we have %d child elements", len(act.Form.ChildElements))
+	t.log.Info().Msgf("found form we have %d child elements", len(act.Form.ChildElements))
 	form.ScrollTo()
 
 	var submitButton *Element
 	for _, formChild := range act.Form.ChildElements {
-		//if htmlElement.Type != browserk.INPUT && htmlElement.Type != browserk.BUTTON {
-		//	log.Debug().Msgf("SKIPPING ELEMENT %s", browserk.HTMLTypeToStrMap[htmlElement.Type])
-		//	continue
-		//}
 
 		actualElement, err := t.FindByHTMLElement(formChild)
 		if err != nil {
-			log.Error().Err(err).Str("type", browserk.HTMLTypeToStrMap[formChild.Type]).Msg("failed to find")
+			t.log.Error().Err(err).Str("type", browserk.HTMLTypeToStrMap[formChild.Type]).Msg("failed to find")
 			continue
 		}
 
 		if formChild.Type == browserk.INPUT && formChild.Value != "" {
 			actualElement.Focus()
 			if err := actualElement.SendKeys(formChild.Value); err != nil {
-				log.Error().Err(err).Msg("failed to send keys")
+				t.log.Error().Err(err).Msg("failed to send keys")
 			}
 		}
 		//log.Debug().Msgf("[%s] comparing %s ~ %s", browserk.HTMLTypeToStrMap[formChild.Type], string(formChild.Hash()), string(act.Form.SubmitButtonID))
 		if bytes.Compare(formChild.Hash(), act.Form.SubmitButtonID) == 0 {
-			log.Info().Msgf("found submit button %#v", act.Form)
+			t.log.Info().Msgf("found submit button %#v", act.Form)
 			submitButton = actualElement
 		}
 	}
 	if submitButton == nil {
 		return &ErrElementNotFound{}
 	}
-	log.Info().Msgf("Submitting form... %s", submitButton.String())
+	t.log.Info().Msgf("Submitting form... %s", submitButton.String())
 	return submitButton.Click()
 }
 
@@ -222,7 +220,7 @@ func (t *Tab) Navigate(ctx context.Context, url string) error {
 
 	t.setIsNavigating(true)
 	defer t.setIsNavigating(false)
-	log.Debug().Msgf("navigating to %s", url)
+	t.log.Debug().Msgf("navigating to %s", url)
 	navParams := &gcdapi.PageNavigateParams{Url: url, TransitionType: "typed"}
 	frameID, _, errText, err := t.t.Page.NavigateWithParams(navParams)
 	if err != nil {
@@ -235,7 +233,7 @@ func (t *Tab) Navigate(ctx context.Context, url string) error {
 	}
 
 	t.lastNodeChangeTimeVal.Store(time.Now())
-	log.Debug().Msgf("waiting ready for %s", url)
+	t.log.Debug().Msgf("waiting ready for %s", url)
 	return t.waitReady(ctx, t.stableAfter)
 }
 
@@ -264,7 +262,7 @@ func (t *Tab) FindByHTMLElement(toFind browserk.ActHTMLElement) (*Element, error
 	tag := toFind.Tag()
 	foundElements, err := t.GetElementsBySelector(tag)
 	if err != nil {
-		log.Error().Err(err).Msgf("searching for tag: %s failed", tag)
+		t.log.Error().Err(err).Msgf("searching for tag: %s failed", tag)
 		return nil, err
 	}
 
@@ -278,9 +276,9 @@ func (t *Tab) FindByHTMLElement(toFind browserk.ActHTMLElement) (*Element, error
 	} else {
 		for _, found := range foundElements {
 			h := ElementToHTMLElement(found)
-			log.Debug().Msgf("[%s] comparing %s ~ %s (%#v) vs (%#v)", browserk.HTMLTypeToStrMap[h.Type], string(h.Hash()), string(toFind.Hash()), h.Attributes, toFind.AllAttributes())
+			t.log.Debug().Msgf("[%s] comparing %s ~ %s (%#v) vs (%#v)", browserk.HTMLTypeToStrMap[h.Type], string(h.Hash()), string(toFind.Hash()), h.Attributes, toFind.AllAttributes())
 			if bytes.Compare(h.Hash(), toFind.Hash()) == 0 && h.NodeDepth == toFind.Depth() {
-				log.Info().Msg("found by nearly exact match")
+				t.log.Info().Msg("found by nearly exact match")
 				return found, nil
 			}
 		}
@@ -358,7 +356,7 @@ func (t *Tab) InjectJS(inject string) (interface{}, error) {
 		return nil, err
 	}
 	if exp != nil {
-		log.Warn().Err(err).Msg("failed to inject script")
+		t.log.Warn().Err(err).Msg("failed to inject script")
 	}
 
 	return r.Value, nil
@@ -380,7 +378,7 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 
 	navTimer := time.After(45 * time.Second)
 	// wait navigation to complete.
-	log.Info().Msg("waiting for nav to complete")
+	t.log.Info().Msg("waiting for nav to complete")
 	select {
 	case <-navTimer:
 		return ErrNavigationTimedOut
@@ -396,7 +394,7 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 	stableTimer := time.After(5 * time.Second)
 	defer t.t.Page.GetResourceTree()
 	// wait for DOM & network stability
-	log.Info().Msg("waiting for nav stability complete")
+	t.log.Info().Msg("waiting for nav stability complete")
 	for {
 		select {
 		case reason := <-t.crashedCh:
@@ -406,14 +404,14 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 		case <-t.exitCh:
 			return ErrTabClosing
 		case <-stableTimer:
-			log.Info().Msg("stability timed out")
+			t.log.Info().Msg("stability timed out")
 			return ErrTimedOut
 		case <-ticker.C:
 			if changeTime, ok := t.lastNodeChangeTimeVal.Load().(time.Time); ok {
-				log.Info().Int32("requests", t.container.OpenRequestCount()).Msgf("tick %s >= %s", time.Now().Sub(changeTime), stableAfter)
+				t.log.Info().Int32("requests", t.container.OpenRequestCount()).Msgf("tick %s >= %s", time.Now().Sub(changeTime), stableAfter)
 				if time.Now().Sub(changeTime) >= stableAfter && t.container.OpenRequestCount() == 0 {
 					// times up, should be stable now
-					log.Info().Msg("stable")
+					t.log.Info().Msg("stable")
 					return nil
 				}
 			}
@@ -557,7 +555,7 @@ func (t *Tab) evaluateScript(scriptSource string, awaitPromise bool) (*gcdapi.Ru
 		return nil, err
 	}
 	if exp != nil {
-		log.Warn().Err(err).Msg("failed to inject script")
+		t.log.Warn().Err(err).Msg("failed to inject script")
 	}
 
 	return r, nil
@@ -637,13 +635,13 @@ func (t *Tab) GetScriptSource(scriptID string) (string, error) {
 
 // Gets the top document and updates our list of elements it creates all new nodeIDs.
 func (t *Tab) getDocument() (*Element, error) {
-	log.Debug().Msgf("getDocument doc id was: %d", t.getTopNodeID())
+	t.log.Debug().Msgf("getDocument doc id was: %d", t.getTopNodeID())
 	doc, err := t.t.DOM.GetDocument(-1, true)
 	if err != nil {
 		return nil, err
 	}
 	t.setTopNodeID(doc.NodeId)
-	log.Debug().Msgf("getDocument doc id is now: %d", t.getTopNodeID())
+	t.log.Debug().Msgf("getDocument doc id is now: %d", t.getTopNodeID())
 	t.addNodes(doc, 0)
 	eleDoc, _ := t.getElement(doc.NodeId)
 	return eleDoc, nil
@@ -727,11 +725,11 @@ func (t *Tab) getDocumentElementByID(docNodeID int, attributeID string) (*Elemen
 // GetElementsBySelector all elements that match a selector from the top level document
 // also searches sub frames
 func (t *Tab) GetElementsBySelector(selector string) ([]*Element, error) {
-	log.Debug().Msgf("searching for %s", selector)
+	t.log.Debug().Msgf("searching for %s", selector)
 	elements, err := t.GetDocumentElementsBySelector(t.getTopNodeID(), selector)
 	if err != nil {
 		// try again but refresh the doc
-		log.Debug().Msg("failed to find element, refreshing document and trying again")
+		t.log.Debug().Msg("failed to find element, refreshing document and trying again")
 		t.RefreshDocument()
 		elements, err = t.GetDocumentElementsBySelector(t.getTopNodeID(), selector)
 		if err != nil {
@@ -744,7 +742,7 @@ func (t *Tab) GetElementsBySelector(selector string) ([]*Element, error) {
 	for _, id := range frameNodeIDs {
 		frameElements, err := t.GetDocumentElementsBySelector(id, selector)
 		if err != nil {
-			log.Warn().Msg("failed to search frame for elements")
+			t.log.Warn().Msg("failed to search frame for elements")
 			continue
 		}
 		elements = append(elements, frameElements...)
@@ -807,7 +805,7 @@ func (t *Tab) recursivelyGetChildren(children []*gcdapi.DOMNode, elements *[]*El
 func (t *Tab) GetDocumentElementsBySelector(docNodeID int, selector string) ([]*Element, error) {
 	nodeIDs, errQuery := t.t.DOM.QuerySelectorAll(docNodeID, selector)
 	if errQuery != nil {
-		log.Info().Msgf("QuerySelectorAll Err: searching for %s %d", selector, docNodeID)
+		t.log.Info().Msgf("QuerySelectorAll Err: searching for %s %d", selector, docNodeID)
 		return nil, errQuery
 	}
 
@@ -918,7 +916,7 @@ func (t *Tab) invalidateRemove(ele *Element) {
 
 // the entire document has been invalidated, request all nodes again
 func (t *Tab) documentUpdated() {
-	log.Info().Msg("document has been invalidated")
+	t.log.Info().Msg("document has been invalidated")
 	t.docWasUpdated.Store(true)
 	t.getDocument()
 }
@@ -927,7 +925,7 @@ func (t *Tab) documentUpdated() {
 func (t *Tab) requestChildNodes(nodeID, depth int) {
 	_, err := t.t.DOM.RequestChildNodes(nodeID, depth, false)
 	if err != nil {
-		log.Debug().Msgf("error requesting child nodes: %s\n", err)
+		t.log.Debug().Msgf("error requesting child nodes: %s\n", err)
 	}
 }
 
@@ -1003,10 +1001,10 @@ func (t *Tab) listenDebuggerEvents(ctx *browserk.Context) {
 				go t.disconnectedHandler(t, reason)
 			}
 		case <-t.exitCh:
-			log.Info().Msg("exiting...")
+			t.log.Info().Msg("exiting...")
 			return
 		case <-ctx.Ctx.Done():
-			log.Info().Msg("context done exiting...")
+			t.log.Info().Msg("context done exiting...")
 			return
 		}
 	}
@@ -1196,14 +1194,14 @@ func (t *Tab) subscribeBrowserEvents(ctx *browserk.Context, intercept bool) {
 		if err != nil {
 			return
 		}
-		log.Info().Str("type", resp.Params.ErrorType).Msg("handling certificate error")
+		t.log.Info().Str("type", resp.Params.ErrorType).Msg("handling certificate error")
 		p := &gcdapi.SecurityHandleCertificateErrorParams{
 			EventId: resp.Params.EventId,
 			Action:  "continue",
 		}
 
 		t.t.Security.HandleCertificateErrorWithParams(p)
-		log.Info().Msg("certificate error handled")
+		t.log.Info().Msg("certificate error handled")
 	})
 
 	// network related events

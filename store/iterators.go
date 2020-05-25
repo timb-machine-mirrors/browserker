@@ -3,7 +3,6 @@ package store
 import (
 	"bytes"
 
-	"github.com/davecgh/go-spew/spew"
 	badger "github.com/dgraph-io/badger/v2"
 	"gitlab.com/browserker/browserk"
 )
@@ -36,7 +35,6 @@ func StateIterator(txn *badger.Txn, byState browserk.NavState, limit int64) ([][
 			idx++
 		}
 	}
-	spew.Dump(states)
 	// no entries
 	if len(states) == 0 || states[0] == nil {
 		return nil, nil
