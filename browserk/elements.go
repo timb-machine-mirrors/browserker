@@ -20,7 +20,7 @@ type ActHTMLElement interface {
 type HTMLElement struct {
 	Type          HTMLElementType
 	CustomTagName string
-	Events        []HTMLEventType
+	Events        map[string]HTMLEventType // key: line,col => event type
 	Attributes    map[string]string
 	InnerText     string
 	Hidden        bool
@@ -42,6 +42,9 @@ func (h *HTMLElement) Hash() []byte {
 	sort.StringSlice(vals).Sort()
 	sorted := strings.Join(vals, "")
 	hash.Write([]byte(sorted))
+	// include event line/col into the uniqueness
+	evts := sortEvents(h.Events)
+	hash.Write([]byte(evts))
 	h.ID = hash.Sum(nil)
 	return h.ID
 }
@@ -97,7 +100,7 @@ const (
 // HTMLFormElement and it's children
 type HTMLFormElement struct {
 	FormType       FormType
-	Events         []HTMLEventType
+	Events         map[string]HTMLEventType
 	Attributes     map[string]string
 	Hidden         bool
 	NodeDepth      int
@@ -127,6 +130,8 @@ func (h *HTMLFormElement) Hash() []byte {
 	sort.StringSlice(vals).Sort()
 	sorted := strings.Join(vals, "")
 	hash.Write([]byte(sorted))
+	evts := sortEvents(h.Events)
+	hash.Write([]byte(evts))
 	h.ID = hash.Sum(nil)
 	return h.ID
 }
@@ -185,6 +190,18 @@ func (h *HTMLFormElement) GetChildByHash(hash []byte) *HTMLElement {
 		}
 	}
 	return nil
+}
+
+func sortEvents(toSort map[string]HTMLEventType) string {
+	events := make([]string, len(toSort))
+	i := 0
+	for k := range toSort {
+		events[i] = k
+		i++
+	}
+	sort.StringSlice(events).Sort()
+	sorted := strings.Join(events, "")
+	return sorted
 }
 
 // ImportantAttributeValues extracts the values for important attributes depending on HTMLElementType

@@ -2,6 +2,7 @@ package browser
 
 import (
 	"crypto/sha1"
+	"strconv"
 	"strings"
 	"time"
 
@@ -13,7 +14,7 @@ import (
 // ElementToHTMLElement convert
 func ElementToHTMLElement(ele *Element) *browserk.HTMLElement {
 	var ok bool
-	b := &browserk.HTMLElement{Events: make([]browserk.HTMLEventType, 0)}
+	b := &browserk.HTMLElement{Events: make(map[string]browserk.HTMLEventType, 0)}
 	b.Type = browserk.CUSTOM
 
 	tag, _ := ele.GetTagName()
@@ -27,7 +28,10 @@ func ElementToHTMLElement(ele *Element) *browserk.HTMLElement {
 			if !ok {
 				eventType = browserk.HTMLEventcustom
 			}
-			b.Events = append(b.Events, eventType)
+			line := strconv.Itoa(listener.LineNumber)
+			col := strconv.Itoa(listener.ColumnNumber)
+
+			b.Events[line+" "+col] = eventType
 		}
 	}
 
@@ -39,7 +43,7 @@ func ElementToHTMLElement(ele *Element) *browserk.HTMLElement {
 }
 
 func ElementToHTMLFormElement(ele *Element) *browserk.HTMLFormElement {
-	b := &browserk.HTMLFormElement{Events: make([]browserk.HTMLEventType, 0)}
+	b := &browserk.HTMLFormElement{Events: make(map[string]browserk.HTMLEventType, 0)}
 	b.Attributes, _ = ele.GetAttributes()
 	b.NodeDepth = ele.Depth()
 	listeners, err := ele.GetEventListeners()
@@ -49,7 +53,10 @@ func ElementToHTMLFormElement(ele *Element) *browserk.HTMLFormElement {
 			if !ok {
 				eventType = browserk.HTMLEventcustom
 			}
-			b.Events = append(b.Events, eventType)
+			line := strconv.Itoa(listener.LineNumber)
+			col := strconv.Itoa(listener.ColumnNumber)
+
+			b.Events[line+" "+col] = eventType
 		}
 	}
 
