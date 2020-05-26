@@ -2,6 +2,7 @@ package clicmds
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"os/signal"
@@ -52,12 +53,17 @@ func CrawlerFlags() []cli.Flag {
 			Usage: "max depth of nav paths to traverse",
 			Value: 10,
 		},
+		&cli.BoolFlag{
+			Name:  "summary",
+			Usage: "print summary of urls/graph actions taken",
+			Value: true,
+		},
 	}
 }
 
 // Crawler runs browserker crawler
-func Crawler(ctx *cli.Context) error {
-	if ctx.Bool("profile") {
+func Crawler(cliCtx *cli.Context) error {
+	if cliCtx.Bool("profile") {
 		go func() {
 			http.ListenAndServe(":6060", nil)
 		}()
@@ -66,14 +72,14 @@ func Crawler(ctx *cli.Context) error {
 	cfg := &browserk.Config{}
 	cfg.FormData = &browserk.DefaultFormValues
 
-	if ctx.String("config") == "" {
+	if cliCtx.String("config") == "" {
 		cfg = &browserk.Config{
-			URL:         ctx.String("url"),
-			NumBrowsers: ctx.Int("numbrowsers"),
-			MaxDepth:    ctx.Int("maxdepth"),
+			URL:         cliCtx.String("url"),
+			NumBrowsers: cliCtx.Int("numbrowsers"),
+			MaxDepth:    cliCtx.Int("maxdepth"),
 		}
 	} else {
-		data, err := ioutil.ReadFile(ctx.String("config"))
+		data, err := ioutil.ReadFile(cliCtx.String("config"))
 		if err != nil {
 			return err
 		}
@@ -82,11 +88,11 @@ func Crawler(ctx *cli.Context) error {
 			return err
 		}
 
-		if cfg.URL == "" && ctx.String("url") != "" {
-			cfg.URL = ctx.String("url")
+		if cfg.URL == "" && cliCtx.String("url") != "" {
+			cfg.URL = cliCtx.String("url")
 		}
-		if cfg.DataPath == "" && ctx.String("datadir") != "" {
-			cfg.DataPath = ctx.String("datadir")
+		if cfg.DataPath == "" && cliCtx.String("datadir") != "" {
+			cfg.DataPath = cliCtx.String("datadir")
 		}
 	}
 	os.RemoveAll(cfg.DataPath)
@@ -120,9 +126,45 @@ func Crawler(ctx *cli.Context) error {
 		log.Error().Err(err).Msg("browserk failure occurred")
 	}
 
+	if cliCtx.Bool("summary") {
+		printSummary(crawl)
+	}
+
 	return browserk.Stop()
 }
 
-func profile() {
+func printSummary(crawl *store.CrawlGraph) error {
+	results, err := crawl.GetNavigationResults()
+	if err != nil {
+		return err
+	}
 
+	if results == nil {
+		return fmt.Errorf("No result entries found")
+	}
+	fmt.Printf("Had %d results\n", len(results))
+	for _, entry := range results {
+		if entry.Messages != nil {
+			for _, m := range entry.Messages {
+				if m.Request == nil {
+					continue
+				}
+				fmt.Printf("URL visited: %s\n", m.Request.DocumentURL)
+			}
+		}
+	}
+	entries := crawl.Find(nil, browserk.NavVisited, browserk.NavVisited, 999)
+	fmt.Printf("Had %d entries\n", len(entries))
+
+	for _, paths := range entries {
+		fmt.Printf("Path: \n")
+		for i, path := range paths {
+			if len(paths)-1 == i {
+				fmt.Printf("%s %s\n", browserk.ActionTypeMap[path.Action.Type], path.Action)
+				break
+			}
+			fmt.Printf("%s %s -> ", browserk.ActionTypeMap[path.Action.Type], path.Action)
+		}
+	}
+	return nil
 }

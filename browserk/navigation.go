@@ -126,6 +126,7 @@ func NewNavigationFromElement(from *Navigation, triggeredBy TriggeredBy, ele *HT
 			h.Write(n.OriginID)
 		}
 	}
+	h.Write([]byte{byte(aType)})
 	h.Write(n.Action.Element.Hash())
 	n.ID = h.Sum(nil)
 	return n

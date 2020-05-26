@@ -12,6 +12,7 @@ import (
 
 	"github.com/pkg/errors"
 	"gitlab.com/browserker/browserk"
+	"gitlab.com/browserker/scanner/browser/keymap"
 
 	"github.com/wirepair/gcd"
 	"github.com/wirepair/gcd/gcdapi"
@@ -105,46 +106,65 @@ func (t *Tab) Close() {
 // ExecuteAction for this browser, calling js handler after it is called
 func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, bool, error) {
 	var err error
+	var ele *Element
 	causedLoad := false
 	// Call JSBefore hooks
 	t.ctx.NextJSBefore(t)
 
 	// reset doc was updated flag
 	t.docWasUpdated.Store(false)
+
+	errMsg := fmt.Sprintf("unable to find element for %s", browserk.ActionTypeMap[act.Type])
+
+	if act.Type > browserk.ActExecuteJS && act.Type < browserk.ActFillForm {
+		ele, err = t.FindByHTMLElement(act.Element)
+		if err != nil {
+			t.ctx.Log.Warn().Err(err).Msg(errMsg)
+			return nil, false, err
+		}
+	}
 	// do action
 	switch act.Type {
+
 	case browserk.ActLoadURL:
 		t.Navigate(ctx, string(act.Input))
 	case browserk.ActExecuteJS:
 		t.InjectJS(string(act.Input))
-	case browserk.ActLeftClick:
-		ele, err := t.FindByHTMLElement(act.Element)
-		if err != nil {
-			t.ctx.Log.Warn().Err(err).Msg("unable to find element to click for action")
-			return nil, false, err
-		}
-		if err = ele.Click(); err != nil {
-			t.ctx.Log.Warn().Err(err).Msg("unable to click element for action")
+	case browserk.ActLeftClick, browserk.ActLeftClickDown, browserk.ActLeftClickUp, browserk.ActDoubleClick:
+		ele.ScrollTo()
+		if act.Type == browserk.ActDoubleClick {
+			if err = ele.DoubleClick(); err != nil {
+				t.ctx.Log.Warn().Err(err).Msg(errMsg)
+			}
+		} else {
+			if err = ele.Click(); err != nil {
+				t.ctx.Log.Warn().Err(err).Msg(errMsg)
+			}
 		}
 		t.ctx.Log.Debug().Str("action", act.String()).Msg("clicked element")
 	case browserk.ActFillForm:
 		t.ctx.Log.Info().Str("action", act.String()).Msg("fill form action executing...")
 		t.FillForm(act)
-	case browserk.ActLeftClickDown:
-	case browserk.ActLeftClickUp:
 	case browserk.ActRightClick:
-	case browserk.ActRightClickDown:
-	case browserk.ActRightClickUp:
-	case browserk.ActMiddleClick:
-	case browserk.ActMiddleClickDown:
-	case browserk.ActMiddleClickUp:
 	case browserk.ActScroll:
+		ele.ScrollTo()
 	case browserk.ActSendKeys:
 	case browserk.ActKeyUp:
 	case browserk.ActKeyDown:
 	case browserk.ActHover:
+		ele.ScrollTo()
+		ele.MouseOver()
+		time.Sleep(time.Millisecond * 400)
 	case browserk.ActFocus:
+		ele.ScrollTo()
+		ele.Focus()
 	case browserk.ActWait:
+	case browserk.ActMouseOverAndOut:
+		ele.ScrollTo()
+		ele.MouseOver()
+		t.MoveMouse(0, 0)
+	case browserk.ActMouseWheel:
+
 	}
 	// add small delay after action
 	timer := time.NewTimer(time.Millisecond * 200)
@@ -186,6 +206,8 @@ func (t *Tab) FillForm(act *browserk.Action) error {
 	form.ScrollTo()
 
 	var submitButton *Element
+	radioClicked := false
+	checkboxClicked := false
 	for _, formChild := range act.Form.ChildElements {
 
 		actualElement, err := t.FindByHTMLElement(formChild)
@@ -193,13 +215,28 @@ func (t *Tab) FillForm(act *browserk.Action) error {
 			t.ctx.Log.Error().Err(err).Str("type", browserk.HTMLTypeToStrMap[formChild.Type]).Msg("failed to find")
 			continue
 		}
-
 		if formChild.Type == browserk.INPUT && formChild.Value != "" {
 			actualElement.Focus()
 			if err := actualElement.SendKeys(formChild.Value); err != nil {
 				t.ctx.Log.Error().Err(err).Msg("failed to send keys")
 			}
+			continue
 		}
+
+		if formChild.Type == browserk.SELECT {
+			// down twice in case it's a 'option disabled' style select list
+			actualElement.SendRawKeys(keymap.ArrowDown + keymap.ArrowDown + keymap.Enter)
+		} else if formChild.Type == browserk.INPUT && formChild.GetAttribute("list") != "" {
+			actualElement.SendRawKeys(keymap.ArrowDown + keymap.ArrowDown + keymap.Enter)
+			// ghetto, as there could be multiple groups of radio/checkboxes, todo make this better
+		} else if formChild.Type == browserk.INPUT && formChild.GetAttribute("type") == "radio" && !radioClicked {
+			actualElement.Click()
+			radioClicked = true
+		} else if formChild.Type == browserk.INPUT && formChild.GetAttribute("type") == "checkbox" && !checkboxClicked {
+			actualElement.Click()
+			checkboxClicked = true
+		}
+
 		//log.Debug().Msgf("[%s] comparing %s ~ %s", browserk.HTMLTypeToStrMap[formChild.Type], string(formChild.Hash()), string(act.Form.SubmitButtonID))
 		if bytes.Compare(formChild.Hash(), act.Form.SubmitButtonID) == 0 {
 			t.ctx.Log.Info().Msgf("found submit button %#v", act.Form)
@@ -301,20 +338,17 @@ func (t *Tab) FindElements(querySelector string) ([]*browserk.HTMLElement, error
 	return bElements, nil
 }
 
-func (t *Tab) FindClickables() ([]*browserk.HTMLElement, error) {
+// FindInteractables returns elements that have a static/dynamic bound event listener
+func (t *Tab) FindInteractables() ([]*browserk.HTMLElement, error) {
 	cElements := make([]*browserk.HTMLElement, 0)
 	allElements := t.GetAllElements()
 
 	for _, ele := range allElements {
-		listeners, err := ele.GetEventListeners()
+		_, err := ele.GetEventListeners()
 		if err != nil {
 			continue
 		}
-		for _, evt := range listeners {
-			if evt.Type == "click" {
-				cElements = append(cElements, ElementToHTMLElement(ele))
-			}
-		}
+		cElements = append(cElements, ElementToHTMLElement(ele))
 	}
 	return cElements, nil
 }

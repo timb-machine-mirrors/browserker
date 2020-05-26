@@ -122,7 +122,7 @@ func (b *BrowserkCrawler) snapshot(bctx *browserk.Context, browser browserk.Brow
 		}
 	}
 
-	cElements, err := browser.FindClickables()
+	cElements, err := browser.FindInteractables()
 	if err == nil {
 		for _, ele := range cElements {
 			// assume in scope for now
@@ -188,14 +188,41 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 		}*/
 	}
 
-	cElements, err := browser.FindClickables()
+	cElements, err := browser.FindInteractables()
 	if err == nil {
 		for _, ele := range cElements {
 			// assume in scope for now
 			if !diff.Has(ele.Type, ele.Hash()) {
-				nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, ele, browserk.ActLeftClick)
-				nav.Scope = browserk.InScope
-				navs = append(navs, nav)
+				for _, eventType := range ele.Events {
+					var actType browserk.ActionType
+					switch eventType {
+					case browserk.HTMLEventfocusin, browserk.HTMLEventfocus:
+						actType = browserk.ActFocus
+					case browserk.HTMLEventblur, browserk.HTMLEventfocusout:
+						actType = browserk.ActBlur
+					case browserk.HTMLEventclick, browserk.HTMLEventauxclick, browserk.HTMLEventmousedown, browserk.HTMLEventmouseup:
+						actType = browserk.ActLeftClick
+					case browserk.HTMLEventdblclick:
+						actType = browserk.ActDoubleClick
+					case browserk.HTMLEventmouseenter, browserk.HTMLEventmouseleave, browserk.HTMLEventmouseout:
+						actType = browserk.ActMouseOverAndOut
+					case browserk.HTMLEventkeydown, browserk.HTMLEventkeypress, browserk.HTMLEventkeyup:
+						actType = browserk.ActSendKeys
+					case browserk.HTMLEventwheel:
+						actType = browserk.ActMouseWheel
+					case browserk.HTMLEventcontextmenu:
+						actType = browserk.ActRightClick
+					}
+
+					if actType != 0 {
+						log.Info().Msgf("Adding action: %s for eventType: %v", browserk.ActionTypeMap[actType], eventType)
+						nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, ele, actType)
+						nav.Scope = browserk.InScope
+						log.Info().Msgf("nav hash: %s", string(nav.ID))
+						navs = append(navs, nav)
+					}
+				}
+
 			}
 		}
 	}

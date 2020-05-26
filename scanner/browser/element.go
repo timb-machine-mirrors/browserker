@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/wirepair/gcd/gcdapi"
+	"gitlab.com/browserker/scanner/browser/keymap"
 )
 
 // ErrIncorrectElementType an attempt was made to execute a method for which the element type is incorrect
@@ -613,6 +614,7 @@ func (e *Element) MouseOver() error {
 	if err != nil {
 		return err
 	}
+
 	return e.tab.MoveMouse(float64(x), float64(y))
 }
 
@@ -658,6 +660,22 @@ func (e *Element) SendKeys(text string) error {
 		return err
 	}
 	return e.tab.SendKeys(text)
+}
+
+func (e *Element) SendRawKeys(keys string) error {
+	e.Focus()
+	err := e.Click()
+	if err != nil {
+		return err
+	}
+	for _, c := range keys {
+		toSend := keymap.KeyEncode(c)
+		for _, key := range toSend {
+			_, err = e.tab.t.Input.DispatchKeyEventWithParams(key)
+			time.Sleep(time.Millisecond * 70) // small delay inbetween key presses
+		}
+	}
+	return err
 }
 
 // String gnarly output mode activated

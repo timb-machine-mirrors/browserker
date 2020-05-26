@@ -11,25 +11,26 @@ const (
 	ActLeftClickDown
 	ActLeftClickUp
 	ActRightClick
-	ActRightClickDown
-	ActRightClickUp
-	ActMiddleClick
-	ActMiddleClickDown
-	ActMiddleClickUp
+	ActDoubleClick
 	ActScroll
 	ActSendKeys
 	ActKeyUp
 	ActKeyDown
 	ActHover
 	ActFocus
-	ActWait
+	ActBlur
+	ActMouseOverAndOut
+	ActMouseWheel
+
 	ActFillForm
+	ActWait
 
 	// ActionTypes that occured automatically
 	ActRedirect
 	ActSubRequest
 )
 
+// ActionTypeMap to display the action
 var ActionTypeMap = map[ActionType]string{
 	ActLoadURL:         "ActLoadURL",
 	ActExecuteJS:       "ActExecuteJS",
@@ -37,18 +38,17 @@ var ActionTypeMap = map[ActionType]string{
 	ActLeftClickDown:   "ActLeftClickDown",
 	ActLeftClickUp:     "ActLeftClickUp",
 	ActRightClick:      "ActRightClick",
-	ActRightClickDown:  "ActRightClickDown",
-	ActRightClickUp:    "ActRightClickUp",
-	ActMiddleClick:     "ActMiddleClick",
-	ActMiddleClickDown: "ActMiddleClickDown",
-	ActMiddleClickUp:   "ActMiddleClickUp",
+	ActDoubleClick:     "ActDoubleClick",
 	ActScroll:          "ActScroll",
 	ActSendKeys:        "ActSendKeys",
 	ActKeyUp:           "ActKeyUp",
 	ActKeyDown:         "ActKeyDown",
 	ActHover:           "ActHover",
 	ActFocus:           "ActFocus",
+	ActBlur:            "ActBlur",
 	ActWait:            "ActWait",
+	ActMouseOverAndOut: "ActMouseOverAndOut",
+	ActMouseWheel:      "ActMouseWheel",
 	ActFillForm:        "ActFillForm",
 
 	// ActionTypes that occured automatically

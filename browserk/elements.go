@@ -155,13 +155,14 @@ func (h *HTMLFormElement) Depth() int {
 	return h.NodeDepth
 }
 
-func (h *HTMLFormElement) GetNextInput(start int) *HTMLElement {
+// GetNextOf returns a child element of the requested type if it exists
+func (h *HTMLFormElement) GetNextOf(start int, elementType HTMLElementType) *HTMLElement {
 	if start > len(h.ChildElements)-1 {
 		return nil
 	}
 
 	for i := start; i < len(h.ChildElements); i++ {
-		if h.ChildElements[i].Type == INPUT {
+		if h.ChildElements[i].Type == elementType {
 			return h.ChildElements[i]
 		}
 	}

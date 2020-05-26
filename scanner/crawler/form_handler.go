@@ -29,7 +29,7 @@ func (c *CrawlerFormHandler) Init() error {
 }
 
 // InputDetails for an input tag
-// TODO: Handle select, datalist, radio, checkbox, file
+// TODO: Handle file
 type InputDetails struct {
 	Name        string
 	ID          string
@@ -113,6 +113,7 @@ func (c *CrawlerFormHandler) GetSuggestedInput(input *InputDetails) string {
 	case "reset", "button", "submit":
 		return "" // this could be a reset/clear button so do nothing
 	case "checkbox":
+		return ""
 	case "color":
 		return "#e66465"
 	case "date":
@@ -188,6 +189,7 @@ func (c *CrawlerFormHandler) GetSuggestedInput(input *InputDetails) string {
 	case "password":
 		return c.formData.Password
 	case "radio":
+		return ""
 	case "tel":
 		if input.Pattern != "" {
 			result, err := regen.Generate(input.Pattern)
@@ -417,9 +419,9 @@ func (c *CrawlerFormHandler) CreateFormContext(form *browserk.HTMLFormElement) *
 			// if it's empty let's just use the next input element as
 			// this label *should* be for that input
 			if attr := ele.GetAttribute("for"); attr == "" {
-				in := form.GetNextInput(i)
+				in := form.GetNextOf(i, browserk.INPUT)
 				if in != nil {
-					forHash = string(ele.Hash())
+					forHash = string(in.Hash())
 				}
 			} else {
 				childEle := form.GetChildByNameOrID(attr)
@@ -435,6 +437,14 @@ func (c *CrawlerFormHandler) CreateFormContext(form *browserk.HTMLFormElement) *
 			// that has precedence
 			if ele.GetAttribute("type") == "submit" && formContext.Submit == nil {
 				formContext.Submit = ele.Hash()
+				continue
+			}
+			// treat lists as a select where we will ArrowDown -> select
+			if ele.GetAttribute("list") != "" {
+				continue
+			}
+
+			if ele.GetAttribute("type") == "radio" || ele.GetAttribute("type") == "checkbox" {
 				continue
 			}
 
