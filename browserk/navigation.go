@@ -159,6 +159,9 @@ func (n *NavigationResult) Hash() []byte {
 	h.Write(n.NavigationID)
 	h.Write([]byte(n.StartURL))
 	h.Write([]byte(n.EndURL))
+	if n.MessageCount > 0 {
+		h.Write([]byte(n.Messages[0].Request.DocumentURL))
+	}
 	n.ID = h.Sum(nil)
 	return n.ID
 }

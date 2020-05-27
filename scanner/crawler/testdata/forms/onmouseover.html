@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+
+<head>
+    <title>mouse test</title>
+    <script>
+        window.addEventListener('load', function () {
+            document.getElementById('clicker').addEventListener('mouseover', function () {
+                var req = new XMLHttpRequest();
+                req.open('GET', '/result/formResult');
+                req.send("boop");
+            })
+        })
+    </script>
+</head>
+
+<body>
+    <div id="clicker">click me or something</div>
+</body>
+
+</html>

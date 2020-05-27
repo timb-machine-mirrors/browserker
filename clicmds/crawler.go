@@ -149,7 +149,7 @@ func printSummary(crawl *store.CrawlGraph) error {
 				if m.Request == nil {
 					continue
 				}
-				fmt.Printf("URL visited: %s\n", m.Request.DocumentURL)
+				fmt.Printf("URL visited: (DOC %s) %s\n", m.Request.DocumentURL, m.Request.Request.Url)
 			}
 		}
 	}
@@ -166,5 +166,9 @@ func printSummary(crawl *store.CrawlGraph) error {
 			fmt.Printf("%s %s -> ", browserk.ActionTypeMap[path.Action.Type], path.Action)
 		}
 	}
+	entries = crawl.Find(nil, browserk.NavUnvisited, browserk.NavUnvisited, 999)
+	fmt.Printf("Had %d unvisited entries\n", len(entries))
+	entries = crawl.Find(nil, browserk.NavInProcess, browserk.NavInProcess, 999)
+	fmt.Printf("Had %d inprocess entries\n", len(entries))
 	return nil
 }

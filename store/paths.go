@@ -69,6 +69,5 @@ func WalkOrigin(txn *badger.Txn, predicates []*NavGraphField, entries *[]*browse
 	}
 
 	*entries = append(*entries, nav)
-	log.Info().Msgf("WalkOrigin: len %d", len(*entries))
 	return WalkOrigin(txn, predicates, entries, id)
 }

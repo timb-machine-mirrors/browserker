@@ -204,7 +204,7 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 						actType = browserk.ActLeftClick
 					case browserk.HTMLEventdblclick:
 						actType = browserk.ActDoubleClick
-					case browserk.HTMLEventmouseenter, browserk.HTMLEventmouseleave, browserk.HTMLEventmouseout:
+					case browserk.HTMLEventmouseover, browserk.HTMLEventmouseenter, browserk.HTMLEventmouseleave, browserk.HTMLEventmouseout:
 						actType = browserk.ActMouseOverAndOut
 					case browserk.HTMLEventkeydown, browserk.HTMLEventkeypress, browserk.HTMLEventkeyup:
 						actType = browserk.ActSendKeys
@@ -222,7 +222,6 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 						navs = append(navs, nav)
 					}
 				}
-
 			}
 		}
 	}

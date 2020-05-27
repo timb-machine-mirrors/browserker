@@ -148,9 +148,8 @@ func (t *Tab) ExecuteAction(ctx context.Context, act *browserk.Action) ([]byte, 
 	case browserk.ActRightClick:
 	case browserk.ActScroll:
 		ele.ScrollTo()
-	case browserk.ActSendKeys:
-	case browserk.ActKeyUp:
-	case browserk.ActKeyDown:
+	case browserk.ActSendKeys, browserk.ActKeyUp, browserk.ActKeyDown:
+		ele.SendRawKeys(keymap.Enter)
 	case browserk.ActHover:
 		ele.ScrollTo()
 		ele.MouseOver()

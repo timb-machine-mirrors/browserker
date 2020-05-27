@@ -60,6 +60,13 @@ func TestCrawler(t *testing.T) {
 
 	called := false
 
+	simpleCallFunc := func(c *gin.Context) {
+		called = true
+		resp := "<html><body>You made it!</body></html>"
+		c.Writer.WriteHeader(http.StatusOK)
+		c.Writer.Write([]byte(resp))
+	}
+
 	toTest := [...]crawlerTests{
 		{
 			func(c *gin.Context) {
@@ -108,6 +115,46 @@ func TestCrawler(t *testing.T) {
 			},
 			"http://localhost:%s/forms/radio.html",
 		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/onmouseclick.html",
+		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/onmousedblclick.html",
+		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/onmousedown.html",
+		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/onmouseenter.html",
+		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/onmouseleave.html",
+		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/onmouseout.html",
+		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/onmouseup.html",
+		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/keydown.html",
+		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/keypress.html",
+		},
+		{
+			simpleCallFunc,
+			"http://localhost:%s/forms/keyup.html",
+		},
 	}
 
 	for _, crawlTest := range toTest {
@@ -139,7 +186,7 @@ func TestCrawler(t *testing.T) {
 		}
 
 		if !called {
-			t.Fatalf("form was not submitted")
+			t.Fatalf("form was not submitted: %s\n", target)
 		}
 		called = false
 		pool.Return(ctx, port)
