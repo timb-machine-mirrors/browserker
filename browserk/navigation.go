@@ -34,8 +34,8 @@ const (
 	NavInProcess
 	// NavVisited crawler has visited
 	NavVisited
-	// NavAudited maybe remove, but to set that this navigation has been audited by all plugins
-	NavAudited
+	// NavFailed unable to complete action
+	NavFailed
 )
 
 // Navigation for storing the action and results of navigating
@@ -159,7 +159,7 @@ func (n *NavigationResult) Hash() []byte {
 	h.Write(n.NavigationID)
 	h.Write([]byte(n.StartURL))
 	h.Write([]byte(n.EndURL))
-	if n.MessageCount > 0 {
+	if n.MessageCount > 0 && n.Messages[0].Request != nil {
 		h.Write([]byte(n.Messages[0].Request.DocumentURL))
 	}
 	n.ID = h.Sum(nil)

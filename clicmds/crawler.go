@@ -153,11 +153,22 @@ func printSummary(crawl *store.CrawlGraph) error {
 			}
 		}
 	}
-	entries := crawl.Find(nil, browserk.NavVisited, browserk.NavVisited, 999)
-	fmt.Printf("Had %d entries\n", len(entries))
 
+	entries := crawl.Find(nil, browserk.NavVisited, browserk.NavVisited, 999)
+	printEntries(entries, "visited")
+	entries = crawl.Find(nil, browserk.NavUnvisited, browserk.NavUnvisited, 999)
+	printEntries(entries, "unvisited")
+	entries = crawl.Find(nil, browserk.NavInProcess, browserk.NavInProcess, 999)
+	printEntries(entries, "in process")
+	entries = crawl.Find(nil, browserk.NavInProcess, browserk.NavInProcess, 999)
+	printEntries(entries, "nav failed")
+	return nil
+}
+
+func printEntries(entries [][]*browserk.Navigation, navType string) {
+	fmt.Printf("Had %d %s entries\n", len(entries), navType)
 	for _, paths := range entries {
-		fmt.Printf("Path: \n")
+		fmt.Printf("%s Path: \n", navType)
 		for i, path := range paths {
 			if len(paths)-1 == i {
 				fmt.Printf("%s %s\n", browserk.ActionTypeMap[path.Action.Type], path.Action)
@@ -166,9 +177,4 @@ func printSummary(crawl *store.CrawlGraph) error {
 			fmt.Printf("%s %s -> ", browserk.ActionTypeMap[path.Action.Type], path.Action)
 		}
 	}
-	entries = crawl.Find(nil, browserk.NavUnvisited, browserk.NavUnvisited, 999)
-	fmt.Printf("Had %d unvisited entries\n", len(entries))
-	entries = crawl.Find(nil, browserk.NavInProcess, browserk.NavInProcess, 999)
-	fmt.Printf("Had %d inprocess entries\n", len(entries))
-	return nil
 }

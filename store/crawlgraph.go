@@ -203,6 +203,17 @@ func (g *CrawlGraph) AddResult(result *browserk.NavigationResult) error {
 	})
 }
 
+// FailNavigation for this navID
+func (g *CrawlGraph) FailNavigation(navID []byte) error {
+	return g.GraphStore.Update(func(txn *badger.Txn) error {
+		// set the navigation id to visited
+		// TODO: track failures
+		navIDkey := MakeKey(navID, "state")
+		value, _ := EncodeState(browserk.NavFailed)
+		return txn.Set(navIDkey, value)
+	})
+}
+
 // GetNavigationResult from the navigation id
 func (g *CrawlGraph) GetNavigationResult(navID []byte) (*browserk.NavigationResult, error) {
 	exist := &browserk.NavigationResult{}
@@ -284,8 +295,9 @@ func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserk.NavSta
 			return err
 		})
 
+		// TODO: retry on transaction conflict errors
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to get path to navs")
+			log.Error().Err(err).Msg("failed to get path to navs")
 		}
 	} else {
 		err := g.GraphStore.Update(func(txn *badger.Txn) error {
@@ -307,8 +319,9 @@ func (g *CrawlGraph) Find(ctx context.Context, byState, setState browserk.NavSta
 			return errors.Wrap(err, "path to navs")
 		})
 
+		// TODO: retry on transaction conflict errors
 		if err != nil {
-			log.Fatal().Err(err).Msg("failed to get path to navs")
+			log.Error().Err(err).Msg("failed to get path to navs")
 		}
 	}
 	return entries

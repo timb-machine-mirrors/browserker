@@ -1,4 +1,4 @@
-URL = "http://localhost:8080/pages/9.php"
+URL = "http://localhost:8080/pages/20.php"
 AllowedHosts = ["localhost"]
 ExcludedURIs = ["/logout.php"]
 DataPath = "browserktmp"

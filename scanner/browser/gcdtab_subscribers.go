@@ -17,6 +17,8 @@ func (t *Tab) subscribeTargetCrashed() {
 		select {
 		case t.crashedCh <- "crashed":
 		case <-t.exitCh:
+		case <-t.ctx.Ctx.Done():
+			return
 		}
 	})
 }
@@ -34,6 +36,8 @@ func (t *Tab) subscribeTargetDetached() {
 		select {
 		case t.crashedCh <- reason:
 		case <-t.exitCh:
+		case <-t.ctx.Ctx.Done():
+			return
 		}
 	})
 }
@@ -161,29 +165,21 @@ func (t *Tab) subscribeChildNodeRemoved() {
 func (t *Tab) dispatchNodeChange(evt *NodeChangeEvent) {
 	select {
 	case t.nodeChange <- evt:
+	case <-t.ctx.Ctx.Done():
+		return
 	case <-t.exitCh:
 		return
 	}
 }
 
-/*
-func (t *Tab) subscribeInlineStyleInvalidated() {
-	t.t.Subscribe("DOM.inlineStyleInvalidatedEvent", func(target *gcd.ChromeTarget, payload []byte) {
-		event := &gcdapi.DOMInlineStyleInvalidatedEvent{}
-		err := json.Unmarshal(payload, header)
-		if err == nil {
-			event = header.Params
-			t.nodeChange <- &NodeChangeEvent{EventType: InlineStyleInvalidatedEvent, NodeIds: event.NodeIds}
-		}
-	})
-}
-*/
 func (t *Tab) subscribeDocumentUpdated() {
 	// node ids are no longer valid
 	t.t.Subscribe("DOM.documentUpdated", func(target *gcd.ChromeTarget, payload []byte) {
 		select {
 		case t.nodeChange <- &NodeChangeEvent{EventType: DocumentUpdatedEvent}:
 		case <-t.exitCh:
+		case <-t.ctx.Ctx.Done():
+			return
 		}
 	})
 }
@@ -265,6 +261,15 @@ func (t *Tab) subscribeConsoleEvents() {
 				Observed: time.Now(),
 			}
 			t.container.AddConsoleEvent(evt)
+		}
+	})
+}
+
+func (t *Tab) subscribeModalEvents() {
+	t.t.Subscribe("Page.javascriptDialogOpening", func(target *gcd.ChromeTarget, payload []byte) {
+		message := &gcdapi.PageJavascriptDialogOpeningEvent{}
+		if err := json.Unmarshal(payload, message); err == nil {
+			t.t.Page.HandleJavaScriptDialog(true, "browserk")
 		}
 	})
 }

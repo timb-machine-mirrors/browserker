@@ -22,6 +22,7 @@ func ElementToHTMLElement(ele *Element) *browserk.HTMLElement {
 	b.NodeDepth = ele.Depth()
 	listeners, err := ele.GetEventListeners()
 	b.InnerText = ele.GetInnerText()
+
 	if err == nil {
 		for _, listener := range listeners {
 			eventType, ok := browserk.HTMLEventTypeMap[listener.Type]

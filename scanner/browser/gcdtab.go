@@ -343,8 +343,8 @@ func (t *Tab) FindInteractables() ([]*browserk.HTMLElement, error) {
 	allElements := t.GetAllElements()
 
 	for _, ele := range allElements {
-		_, err := ele.GetEventListeners()
-		if err != nil {
+		listeners, err := ele.GetEventListeners()
+		if err != nil && len(listeners) > 0 {
 			continue
 		}
 		cElements = append(cElements, ElementToHTMLElement(ele))
@@ -444,7 +444,7 @@ func (t *Tab) waitReady(ctx context.Context, stableAfter time.Duration) error {
 	}
 
 	stableTimer := time.After(5 * time.Second)
-	defer t.t.Page.GetResourceTree()
+
 	// wait for DOM & network stability
 	t.ctx.Log.Info().Msg("waiting for nav stability complete")
 	for {
@@ -791,12 +791,14 @@ func (t *Tab) GetElementsBySelector(selector string) ([]*Element, error) {
 
 	// search frames too
 	frameNodeIDs := t.getFrameNodeIDs()
+	t.ctx.Log.Debug().Int("frame_node_count", len(frameNodeIDs)).Msg("found frame nodes")
 	for _, id := range frameNodeIDs {
 		frameElements, err := t.GetDocumentElementsBySelector(id, selector)
 		if err != nil {
 			t.ctx.Log.Warn().Msg("failed to search frame for elements")
 			continue
 		}
+		t.ctx.Log.Debug().Int("found", len(frameElements)).Str("selector", selector).Msg("found in frames")
 		elements = append(elements, frameElements...)
 	}
 	return elements, err
@@ -1062,6 +1064,7 @@ func (t *Tab) listenDebuggerEvents(ctx *browserk.Context) {
 	}
 }
 
+// RefreshDocument to get the current state of DOMNodes
 func (t *Tab) RefreshDocument() {
 	t.handleDocumentUpdated()
 }
@@ -1297,4 +1300,5 @@ func (t *Tab) subscribeBrowserEvents(ctx *browserk.Context, intercept bool) {
 	// events
 	t.subscribeStorageEvents()
 	t.subscribeConsoleEvents()
+	t.subscribeModalEvents()
 }

@@ -150,6 +150,7 @@ func indexFunction(vs []string, t string) int {
 	return -1
 }
 
+// TODO: do regex matching
 func includeFunction(vs []string, t string) bool {
 	return indexFunction(vs, t) >= 0
 }

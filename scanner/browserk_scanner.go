@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -27,17 +28,42 @@ type Browserk struct {
 	readyCh      chan struct{}
 	stateMonitor *time.Ticker
 	mainContext  *browserk.Context
+
+	idMutex          *sync.RWMutex
+	leasedBrowserIDs map[int64]struct{}
 }
 
 // New engine
 func New(cfg *browserk.Config, crawl browserk.CrawlGrapher, attack browserk.AttackGrapher) *Browserk {
-	return &Browserk{cfg: cfg, attackGraph: attack, crawlGraph: crawl, reporter: report.New()}
+	return &Browserk{cfg: cfg, attackGraph: attack, crawlGraph: crawl, reporter: report.New(), leasedBrowserIDs: make(map[int64]struct{}), idMutex: &sync.RWMutex{}}
 }
 
 // SetReporter overrides the default reporter
 func (b *Browserk) SetReporter(reporter browserk.Reporter) *Browserk {
 	b.reporter = reporter
 	return b
+}
+
+func (b *Browserk) addLeased(id int64) {
+	b.idMutex.Lock()
+	b.leasedBrowserIDs[id] = struct{}{}
+	b.idMutex.Unlock()
+}
+
+func (b *Browserk) removeLeased(id int64) {
+	b.idMutex.Lock()
+	delete(b.leasedBrowserIDs, id)
+	b.idMutex.Unlock()
+}
+
+func (b *Browserk) getLeased() []int64 {
+	leased := make([]int64, 0)
+	b.idMutex.RLock()
+	for k := range b.leasedBrowserIDs {
+		leased = append(leased, k)
+	}
+	b.idMutex.RUnlock()
+	return leased
 }
 
 // Init the browsers and stores
@@ -149,7 +175,7 @@ func (b *Browserk) processEntries() {
 		select {
 		case <-b.stateMonitor.C:
 			// TODO: check graph for inprocess values that never made it and reset them to unvisited
-			log.Info().Int("leased_browsers", b.browsers.Leased()).Msg("state monitor ping")
+			log.Info().Int("leased_browsers", b.browsers.Leased()).Ints64("leased_browsers", b.getLeased()).Msg("state monitor ping")
 		case <-b.mainContext.Ctx.Done():
 			log.Info().Msg("scan finished due to context complete")
 			return
@@ -170,6 +196,9 @@ func (b *Browserk) crawl(navs []*browserk.Navigation) {
 		log.Error().Err(err).Msg("failed to take browser")
 		return
 	}
+
+	b.addLeased(browser.ID())
+	defer b.removeLeased(browser.ID())
 
 	crawler := crawler.New(b.cfg)
 	if err := crawler.Init(); err != nil {
@@ -198,7 +227,7 @@ func (b *Browserk) crawl(navs []*browserk.Navigation) {
 		result, newNavs, err := crawler.Process(navCtx, browser, nav, isFinal)
 		if err != nil {
 			navCtx.Log.Error().Err(err).Msg("failed to process action")
-			// TODO: write error result / update nav
+			b.crawlGraph.FailNavigation(nav.ID)
 			break
 		}
 
@@ -207,27 +236,15 @@ func (b *Browserk) crawl(navs []*browserk.Navigation) {
 			if err := b.crawlGraph.AddNavigations(newNavs); err != nil {
 				navCtx.Log.Error().Err(err).Msg("failed to add new navigations")
 			}
-			// TODO: write to graph that navigation has been visited
 		}
 		if err := b.crawlGraph.AddResult(result); err != nil {
 			navCtx.Log.Error().Err(err).Msg("failed to add result")
 		}
 	}
+	navCtx.Log.Info().Msg("closing browser")
 	browser.Close()
 	b.browsers.Return(navCtx.Ctx, port)
 	b.readyCh <- struct{}{}
-}
-
-func (b *Browserk) printActionStep(navs []*browserk.Navigation) string {
-	pathString := ""
-	for i, path := range navs {
-		if len(navs)-1 == i {
-			pathString += fmt.Sprintf("%s %s", browserk.ActionTypeMap[path.Action.Type], path.Action)
-			break
-		}
-		pathString += fmt.Sprintf("%s %s -> ", browserk.ActionTypeMap[path.Action.Type], path.Action)
-	}
-	return pathString
 }
 
 // Stop the browsers
@@ -254,4 +271,16 @@ func (b *Browserk) Stop() error {
 		log.Warn().Err(err).Msg("failed to close crawlGraph")
 	}
 	return err
+}
+
+func (b *Browserk) printActionStep(navs []*browserk.Navigation) string {
+	pathString := ""
+	for i, path := range navs {
+		if len(navs)-1 == i {
+			pathString += fmt.Sprintf("%s %s", browserk.ActionTypeMap[path.Action.Type], path.Action)
+			break
+		}
+		pathString += fmt.Sprintf("%s %s -> ", browserk.ActionTypeMap[path.Action.Type], path.Action)
+	}
+	return pathString
 }

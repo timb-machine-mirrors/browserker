@@ -38,7 +38,7 @@ func (b *BrowserkCrawler) Process(bctx *browserk.Context, browser browserk.Brows
 	browser.GetStorageEvents()
 	browser.GetConsoleEvents()
 
-	if isFinal && entry.Distance != 0 {
+	if isFinal {
 		diff = b.snapshot(bctx, browser)
 	}
 
@@ -95,25 +95,23 @@ func (b *BrowserkCrawler) snapshot(bctx *browserk.Context, browser browserk.Brow
 	diff := NewElementDiffer()
 	browser.RefreshDocument()
 	baseHref := browser.GetBaseHref()
-	formElements, err := browser.FindForms()
-	if err == nil {
+
+	if formElements, err := browser.FindForms(); err == nil {
 		for _, ele := range formElements {
 			diff.Add(browserk.FORM, ele.Hash())
-			for _, child := range ele.ChildElements {
-				diff.Add(child.Type, child.Hash())
-			}
+			//for _, child := range ele.ChildElements {
+			//diff.Add(child.Type, child.Hash())
+			//}
 		}
 	}
 
-	bElements, err := browser.FindElements("button")
-	if err == nil {
+	if bElements, err := browser.FindElements("button"); err == nil {
 		for _, ele := range bElements {
 			diff.Add(browserk.BUTTON, ele.Hash())
 		}
 	}
 
-	aElements, err := browser.FindElements("a")
-	if err == nil {
+	if aElements, err := browser.FindElements("a"); err == nil {
 		for _, ele := range aElements {
 			scope := bctx.Scope.ResolveBaseHref(baseHref, ele.Attributes["href"])
 			if scope == browserk.InScope {
@@ -150,9 +148,9 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 			nav := browserk.NewNavigationFromForm(entry, browserk.TrigCrawler, form)
 			bctx.FormHandler.Fill(form)
 			navs = append(navs, nav)
-		} else {
+		} /*else {
 			bctx.Log.Debug().Str("href", baseHref).Str("action", form.GetAttribute("action")).Msg("was out of scope or already found, not creating new nav")
-		}
+		} */
 	}
 
 	bElements, err := browser.FindElements("button")
@@ -177,15 +175,14 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 	bctx.Log.Debug().Int("link_count", len(aElements)).Msg("found links")
 	for _, a := range aElements {
 		scope := bctx.Scope.ResolveBaseHref(baseHref, a.GetAttribute("href"))
-
 		if scope == browserk.InScope && !diff.Has(browserk.A, a.Hash()) {
-			bctx.Log.Info().Str("href", a.Attributes["href"]).Msg("in scope, adding")
+			bctx.Log.Info().Str("baseHref", baseHref).Str("href", a.Attributes["href"]).Msg("in scope, adding")
 			nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, a, browserk.ActLeftClick)
 			nav.Scope = scope
 			navs = append(navs, nav)
 		} /* else {
-			bctx.Log.Debug().Str("baseHref", baseHref).Str("linkHref", a.GetAttribute("href")).Msg("was out of scope, not creating new nav")
-		}*/
+			bctx.Log.Debug().Str("baseHref", baseHref).Str("linkHref", a.GetAttribute("href")).Msg("a element was out of scope, not creating new nav")
+		} */
 	}
 
 	cElements, err := browser.FindInteractables()
@@ -214,14 +211,17 @@ func (b *BrowserkCrawler) FindNewNav(bctx *browserk.Context, diff *ElementDiffer
 						actType = browserk.ActRightClick
 					}
 
-					if actType != 0 {
-						log.Info().Msgf("Adding action: %s for eventType: %v", browserk.ActionTypeMap[actType], eventType)
-						nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, ele, actType)
-						nav.Scope = browserk.InScope
-						log.Info().Msgf("nav hash: %s", string(nav.ID))
-						navs = append(navs, nav)
+					if actType == 0 {
+						continue
 					}
+					log.Info().Msgf("Adding action: %s for eventType: %v", browserk.ActionTypeMap[actType], eventType)
+					nav := browserk.NewNavigationFromElement(entry, browserk.TrigCrawler, ele, actType)
+					nav.Scope = browserk.InScope
+					log.Info().Msgf("nav hash: %s", string(nav.ID))
+					navs = append(navs, nav)
 				}
+			} else {
+				bctx.Log.Debug().Str("ele", browserk.HTMLTypeToStrMap[ele.Type]).Bytes("hash", ele.Hash()).Msgf("this element already exists %+v", ele.Attributes)
 			}
 		}
 	}

@@ -30,5 +30,6 @@ func (e *ElementDiffer) Has(element browserk.HTMLElementType, hash []byte) bool 
 		return false
 	}
 
-	return e.elements[element][string(hash)] == struct{}{}
+	_, exist := e.elements[element][string(hash)]
+	return exist
 }

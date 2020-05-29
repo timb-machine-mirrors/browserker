@@ -59,7 +59,7 @@ func TestScope(t *testing.T) {
 			browserk.OutOfScope,
 		},
 		{
-			"",
+			"statistics.php",
 			browserk.InScope,
 		},
 	}
@@ -77,12 +77,20 @@ func TestScope(t *testing.T) {
 
 	}
 	// run with a target with ports
-	target, _ = url.Parse("http://localhost:55342/")
-
+	target, _ = url.Parse("http://localhost:8080/")
+	inputs = []struct {
+		in       string
+		expected browserk.Scope
+	}{
+		{
+			"http://localhost:8080/offscanpages/statistics.php",
+			browserk.ExcludedFromScope,
+		},
+	}
 	s = scanner.NewScopeService(target)
 	s.AddScope(allowed, browserk.InScope)
 	s.AddScope(ignored, browserk.OutOfScope)
-	s.AddExcludedURIs([]string{"/log-out", "/signout"})
+	s.AddExcludedURIs([]string{"/offscanpages/statistics.php"})
 	for _, in := range inputs {
 		ret := s.Check(in.in)
 		if ret != in.expected {
