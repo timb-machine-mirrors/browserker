@@ -1,11 +1,10 @@
 package browserk
 
-type ExecutionType int8
-
-// revive:disable:var-naming
+// PluginExecutionType determines how often/when a plugin should be called/executed
+type PluginExecutionType int8
 
 const (
-	ExecOnce ExecutionType = iota
+	ExecOnce PluginExecutionType = iota
 	ExecOncePath
 	ExecOncePerPage
 	ExecAlways
@@ -13,34 +12,20 @@ const (
 	ExecOnlyInjection
 )
 
-type PluginEvent int8
-
-const (
-	EvtDocumentRequest PluginEvent = iota
-	EvtHTTPRequest
-	EvtHTTPResponse
-	EvtWebSocketRequest
-	EvtWeBSocketResponse
-	EvtURL
-	EvtJSResponse
-	EvtStorage
-	EvtCookie
-)
-
 type PluginOpts struct {
-	IsolatedRequests bool          // Initiates it's own requests, isolated from a crawl state
-	WriteResponses   bool          // writes/injects into http/websocket responses
-	WriteRequests    bool          // writes/injects into http/websocket responses
-	WriteJS          bool          // writes/injects JS into the browser
-	ReadResponses    bool          // reads http/websocket responses
-	ReadRequests     bool          // reads http/websocket requests
-	ListenStorage    bool          // listens for local/sessionStorage write/read events
-	ListenCookies    bool          // listens for cookie write events
-	ListenURL        bool          // listens for URL change/updates
-	ListenJS         bool          // listens to JS events
-	ExecutionType    ExecutionType // How often/when this plugin executes
-	Mimes            []string      // list of mime types this plugin will execute on if ExecutionType = ONLY_INJECTION
-	Injections       []string      // list of injection points this plugin will execute on
+	IsolatedRequests bool                // Initiates it's own requests, isolated from a crawl state
+	WriteResponses   bool                // writes/injects into http/websocket responses
+	WriteRequests    bool                // writes/injects into http/websocket responses
+	WriteJS          bool                // writes/injects JS into the browser
+	ReadResponses    bool                // reads http/websocket responses
+	ReadRequests     bool                // reads http/websocket requests
+	ListenStorage    bool                // listens for local/sessionStorage write/read events
+	ListenCookies    bool                // listens for cookie write events
+	ListenURL        bool                // listens for URL change/updates
+	ListenJS         bool                // listens to JS events
+	ExecutionType    PluginExecutionType // How often/when this plugin executes
+	Mimes            []string            // list of mime types this plugin will execute on if ExecutionType = ONLY_INJECTION
+	Injections       []string            // list of injection points this plugin will execute on
 }
 
 type PluginCheck struct {
@@ -57,6 +42,7 @@ type PluginConfig struct {
 	ID       int
 }
 
+// Plugin events
 type Plugin interface {
 	Name() string
 	ID() string
@@ -65,5 +51,5 @@ type Plugin interface {
 	Register() error
 	Unregister() error
 	Ready(browser Browser) (bool, error) // ready for injection or whatever, ret true if injected
-	OnEvent(evt PluginEvent, data []byte)
+	OnEvent(evt *PluginEvent)
 }

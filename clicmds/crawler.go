@@ -97,8 +97,8 @@ func Crawler(cliCtx *cli.Context) error {
 	}
 	os.RemoveAll(cfg.DataPath)
 	crawl := store.NewCrawlGraph(cfg.DataPath + "/crawl")
-	attack := store.NewAttackGraph(cfg.DataPath + "/attack")
-	browserk := scanner.New(cfg, crawl, attack)
+	pluginStore := store.NewPluginStore(cfg.DataPath + "/plugin")
+	browserk := scanner.New(cfg, crawl, pluginStore)
 	log.Logger.Info().Msg("Starting browserker")
 
 	scanContext := context.Background()

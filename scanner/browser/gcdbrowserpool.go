@@ -41,9 +41,7 @@ var startupFlags = []string{
 	"--safebrowsing-disable-auto-update",
 	"--safebrowsing-disable-download-protection",
 	"--deterministic-fetch",
-
 	"--password-store=basic",
-	//"--proxy-server=localhost:8080",
 	"--headless",
 	"about:blank",
 }

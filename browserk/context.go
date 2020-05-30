@@ -32,7 +32,7 @@ type Context struct {
 	Reporter    Reporter
 	Injector    Injector
 	Crawl       CrawlGrapher
-	Attack      AttackGrapher
+	PluginStore PluginStorer
 
 	jsBeforeHandler []JSHandler
 	jsBeforeIndex   int8
@@ -60,7 +60,7 @@ func (c *Context) Copy() *Context {
 		Reporter:        c.Reporter,
 		Injector:        c.Injector,
 		Crawl:           c.Crawl,
-		Attack:          c.Attack,
+		PluginStore:     c.PluginStore,
 		jsBeforeHandler: c.jsBeforeHandler,
 		jsBeforeIndex:   0,
 		jsAfterHandler:  c.jsAfterHandler,

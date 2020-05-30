@@ -19,7 +19,7 @@ import (
 // Browserk is our engine
 type Browserk struct {
 	cfg          *browserk.Config
-	attackGraph  browserk.AttackGrapher
+	pluginStore  browserk.PluginStorer
 	crawlGraph   browserk.CrawlGrapher
 	reporter     browserk.Reporter
 	browsers     browserk.BrowserPool
@@ -34,8 +34,15 @@ type Browserk struct {
 }
 
 // New engine
-func New(cfg *browserk.Config, crawl browserk.CrawlGrapher, attack browserk.AttackGrapher) *Browserk {
-	return &Browserk{cfg: cfg, attackGraph: attack, crawlGraph: crawl, reporter: report.New(), leasedBrowserIDs: make(map[int64]struct{}), idMutex: &sync.RWMutex{}}
+func New(cfg *browserk.Config, crawl browserk.CrawlGrapher, pluginStore browserk.PluginStorer) *Browserk {
+	return &Browserk{
+		cfg:              cfg,
+		pluginStore:      pluginStore,
+		crawlGraph:       crawl,
+		reporter:         report.New(),
+		leasedBrowserIDs: make(map[int64]struct{}),
+		idMutex:          &sync.RWMutex{},
+	}
 }
 
 // SetReporter overrides the default reporter
@@ -83,14 +90,14 @@ func (b *Browserk) Init(ctx context.Context) error {
 		Reporter:    b.reporter,
 		Injector:    nil,
 		Crawl:       b.crawlGraph,
-		Attack:      b.attackGraph,
+		PluginStore: b.pluginStore,
 	}
 	log.Info().Int("num_browsers", b.cfg.NumBrowsers).Int("max_depth", b.cfg.MaxDepth).Msg("Initializing...")
 	b.navCh = make(chan []*browserk.Navigation, b.cfg.NumBrowsers)
 	b.readyCh = make(chan struct{})
 
 	log.Logger.Info().Msg("initializing attack graph")
-	if err := b.attackGraph.Init(); err != nil {
+	if err := b.pluginStore.Init(); err != nil {
 		return err
 	}
 
@@ -260,10 +267,10 @@ func (b *Browserk) Stop() error {
 		log.Warn().Err(err).Msg("failed to close browsers")
 	}
 
-	log.Info().Msg("Closing attack graph")
-	err = b.attackGraph.Close()
+	log.Info().Msg("Closing plugin store")
+	err = b.pluginStore.Close()
 	if err != nil {
-		log.Warn().Err(err).Msg("failed to close attackGraph")
+		log.Warn().Err(err).Msg("failed to plugin store")
 	}
 
 	log.Info().Msg("Closing crawl graph")
