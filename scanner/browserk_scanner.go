@@ -159,6 +159,7 @@ func (b *Browserk) Start() error {
 		entries := b.crawlGraph.Find(b.mainContext.Ctx, browserk.NavUnvisited, browserk.NavInProcess, int64(b.cfg.NumBrowsers))
 		if entries == nil || len(entries) == 0 && b.browsers.Leased() == 0 {
 			log.Info().Msg("no more crawler entries or active browsers")
+			time.Sleep(time.Second * 60)
 			return nil
 		}
 		log.Info().Int("entries", len(entries)).Msg("Found entries")

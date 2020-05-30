@@ -56,14 +56,10 @@ type Tab struct {
 // NewTab to use
 func NewTab(bctx *browserk.Context, gcdBrowser *gcd.Gcd, tab *gcd.ChromeTarget) *Tab {
 	id := rand.Int63() // TODO: generate random or something
-	t := &Tab{
-		t:            tab,
-		ctx:          bctx,
-		container:    NewContainer(),
-		crashedCh:    make(chan string),
-		exitCh:       make(chan struct{}),
-		navigationCh: make(chan int),
-	}
+	t := &Tab{t: tab}
+
+	t.ctx = bctx
+	t.container = NewContainer()
 	t.id = id
 	t.g = gcdBrowser
 	t.eleMutex = &sync.RWMutex{}
@@ -98,8 +94,9 @@ func (t *Tab) defaultDisconnectedHandler(tab *Tab, reason string) {
 	t.ctx.Log.Debug().Msgf("tab %s tabID: %s", reason, tab.t.Target.Id)
 }
 
-// Close the exit channel
+// Close the exit channel and tab
 func (t *Tab) Close() {
+	t.g.CloseTab(t.t)
 	close(t.exitCh)
 }
 
@@ -1087,7 +1084,12 @@ func (t *Tab) handleDocumentUpdated() {
 	t.documentUpdated()
 	// notify if navigating that we received the document update event.
 	if t.IsNavigating() {
-		t.docUpdateCh <- struct{}{} // notify listeners document was updated
+		// notify listeners document was updated
+		select {
+		case t.docUpdateCh <- struct{}{}:
+		case <-t.exitCh:
+			return
+		}
 	}
 }
 
@@ -1300,5 +1302,5 @@ func (t *Tab) subscribeBrowserEvents(ctx *browserk.Context, intercept bool) {
 	// events
 	t.subscribeStorageEvents()
 	t.subscribeConsoleEvents()
-	t.subscribeModalEvents()
+	t.subscribeDialogEvents()
 }

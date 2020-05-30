@@ -265,7 +265,7 @@ func (t *Tab) subscribeConsoleEvents() {
 	})
 }
 
-func (t *Tab) subscribeModalEvents() {
+func (t *Tab) subscribeDialogEvents() {
 	t.t.Subscribe("Page.javascriptDialogOpening", func(target *gcd.ChromeTarget, payload []byte) {
 		message := &gcdapi.PageJavascriptDialogOpeningEvent{}
 		if err := json.Unmarshal(payload, message); err == nil {
