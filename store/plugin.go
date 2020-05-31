@@ -43,9 +43,9 @@ func (s *PluginStore) Init() error {
 	return nil
 }
 
-// IsUnique checks if a plugin event is unique for whatever uniqueFor is
-func (s *PluginStore) IsUnique(evt *browserk.PluginEvent, uniqueFor browserk.UniqueFor) bool {
-	return false
+// IsUnique checks if a plugin event is unique and returns a bitmask of uniqueness
+func (s *PluginStore) IsUnique(evt *browserk.PluginEvent) browserk.Unique {
+	return browserk.UniqueHost | browserk.UniquePath | browserk.UniqueFile | browserk.UniquePage | browserk.UniqueRequest | browserk.UniqueResponse
 }
 
 // AddEvent to the plugin store

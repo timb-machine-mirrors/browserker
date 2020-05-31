@@ -15,6 +15,5 @@ func Context(ctx context.Context) *browserk.Context {
 		Reporter:    nil,
 		Injector:    nil,
 		Crawl:       nil,
-		PluginStore: nil,
 	}
 }

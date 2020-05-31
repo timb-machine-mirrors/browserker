@@ -1,4 +1,4 @@
-package headers
+package storage
 
 import (
 	"github.com/davecgh/go-spew/spew"
@@ -18,12 +18,12 @@ func New(service browserk.PluginServicer) *Plugin {
 
 // Name of the plugin
 func (h *Plugin) Name() string {
-	return "HeaderPlugin"
+	return "StoragePlugin"
 }
 
 // ID unique to browserker
 func (h *Plugin) ID() string {
-	return "BR-P-0002"
+	return "BR-P-0003"
 }
 
 // Config for this plugin
@@ -34,8 +34,8 @@ func (h *Plugin) Config() *browserk.PluginConfig {
 // Options for the plugin manager to take into consideration when dispatching
 func (h *Plugin) Options() *browserk.PluginOpts {
 	return &browserk.PluginOpts{
-		ListenResponses: true,
-		ExecutionType:   browserk.ExecAlways,
+		ListenStorage: true,
+		ExecutionType: browserk.ExecAlways,
 	}
 }
 
@@ -46,6 +46,6 @@ func (h *Plugin) Ready(browser browserk.Browser) (bool, error) {
 
 // OnEvent handles passive events
 func (h *Plugin) OnEvent(evt *browserk.PluginEvent) {
-	log.Info().Msg("GOT HEADER EVENT")
+	log.Info().Msg("GOT STORAGE EVENT")
 	spew.Dump(evt.EventData)
 }

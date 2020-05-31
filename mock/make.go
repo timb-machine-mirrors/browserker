@@ -8,6 +8,17 @@ import (
 	"gitlab.com/browserker/browserk"
 )
 
+func MakeMockConfig() *browserk.Config {
+	return &browserk.Config{
+		URL:             "http://localhost:8080/",
+		AllowedHosts:    []string{"localhost"},
+		NumBrowsers:     5,
+		MaxDepth:        5,
+		FormData:        &browserk.DefaultFormValues,
+		DisabledPlugins: nil,
+	}
+}
+
 // MakeMockAddressForm for an example address form
 func MakeMockAddressForm() *browserk.HTMLFormElement {
 

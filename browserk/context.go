@@ -23,16 +23,16 @@ const abortIndex int8 = math.MaxInt8 / 2
 
 // Context shared between services, browsers and plugins
 type Context struct {
-	Ctx         context.Context
-	Log         *zerolog.Logger
-	CtxComplete func()
-	Auth        AuthService
-	Scope       ScopeService
-	FormHandler FormHandler
-	Reporter    Reporter
-	Injector    Injector
-	Crawl       CrawlGrapher
-	PluginStore PluginStorer
+	Ctx            context.Context
+	Log            *zerolog.Logger
+	CtxComplete    func()
+	Auth           AuthService
+	Scope          ScopeService
+	FormHandler    FormHandler
+	Reporter       Reporter
+	Injector       Injector
+	Crawl          CrawlGrapher
+	PluginServicer PluginServicer
 
 	jsBeforeHandler []JSHandler
 	jsBeforeIndex   int8
@@ -60,7 +60,7 @@ func (c *Context) Copy() *Context {
 		Reporter:        c.Reporter,
 		Injector:        c.Injector,
 		Crawl:           c.Crawl,
-		PluginStore:     c.PluginStore,
+		PluginServicer:  c.PluginServicer,
 		jsBeforeHandler: c.jsBeforeHandler,
 		jsBeforeIndex:   0,
 		jsAfterHandler:  c.jsAfterHandler,

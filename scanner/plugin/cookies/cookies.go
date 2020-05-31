@@ -1,13 +1,19 @@
 package cookies
 
-import "gitlab.com/browserker/browserk"
+import (
+	"github.com/davecgh/go-spew/spew"
+	"github.com/rs/zerolog/log"
+	"gitlab.com/browserker/browserk"
+)
 
 type Plugin struct {
 	service browserk.PluginServicer
 }
 
 func New(service browserk.PluginServicer) *Plugin {
-	return &Plugin{service: service}
+	p := &Plugin{service: service}
+	service.Register(p)
+	return p
 }
 
 // Name of the plugin
@@ -29,15 +35,17 @@ func (h *Plugin) Config() *browserk.PluginConfig {
 func (h *Plugin) Options() *browserk.PluginOpts {
 	return &browserk.PluginOpts{
 		ListenCookies: true,
+		ExecutionType: browserk.ExecAlways,
 	}
 }
 
 // Ready to attack
-func (h *Plugin) Ready(browser *browserk.Browser) (bool, error) {
+func (h *Plugin) Ready(browser browserk.Browser) (bool, error) {
 	return false, nil
 }
 
 // OnEvent handles passive events
 func (h *Plugin) OnEvent(evt *browserk.PluginEvent) {
-
+	log.Info().Msg("GOT COOKIE EVENT")
+	spew.Dump(evt.EventData)
 }

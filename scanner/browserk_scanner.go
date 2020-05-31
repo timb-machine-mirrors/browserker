@@ -13,6 +13,7 @@ import (
 	"gitlab.com/browserker/scanner/auth"
 	"gitlab.com/browserker/scanner/browser"
 	"gitlab.com/browserker/scanner/crawler"
+	"gitlab.com/browserker/scanner/plugin"
 	"gitlab.com/browserker/scanner/report"
 )
 
@@ -84,14 +85,21 @@ func (b *Browserk) Init(ctx context.Context) error {
 	b.mainContext = &browserk.Context{
 		Ctx:         cancelCtx,
 		CtxComplete: cancelFn,
-		Auth:        auth.New(b.cfg),
-		Scope:       b.scopeService(target),
-		FormHandler: crawler.NewCrawlerFormHandler(b.cfg.FormData),
-		Reporter:    b.reporter,
-		Injector:    nil,
-		Crawl:       b.crawlGraph,
-		PluginStore: b.pluginStore,
 	}
+
+	pluginService := plugin.New(b.cfg, b.pluginStore)
+	if err := pluginService.Init(ctx); err != nil {
+		return err
+	}
+
+	b.mainContext.Auth = auth.New(b.cfg)
+	b.mainContext.Scope = b.scopeService(target)
+	b.mainContext.FormHandler = crawler.NewCrawlerFormHandler(b.cfg.FormData)
+	b.mainContext.Reporter = b.reporter
+	b.mainContext.Injector = nil
+	b.mainContext.Crawl = b.crawlGraph
+	b.mainContext.PluginServicer = pluginService
+
 	log.Info().Int("num_browsers", b.cfg.NumBrowsers).Int("max_depth", b.cfg.MaxDepth).Msg("Initializing...")
 	b.navCh = make(chan []*browserk.Navigation, b.cfg.NumBrowsers)
 	b.readyCh = make(chan struct{})
