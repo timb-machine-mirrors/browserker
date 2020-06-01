@@ -125,5 +125,6 @@ type Config struct {
 	NumBrowsers     int
 	MaxDepth        int       // maximum distance of paths we will traverse
 	FormData        *FormData // config form data
+	JSPluginPath    string    // path to javascript plugins (will walk sub directories)
 	DisabledPlugins []string  // plugins we will not load
 }

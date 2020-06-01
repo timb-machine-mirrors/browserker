@@ -2,7 +2,11 @@ package plugin
 
 import (
 	"context"
+	"os"
+	"path/filepath"
+	"strings"
 
+	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
 	"gitlab.com/browserker/scanner/plugin/cookies"
 	"gitlab.com/browserker/scanner/plugin/headers"
@@ -41,11 +45,17 @@ func New(cfg *browserk.Config, pluginStore browserk.PluginStorer) *Service {
 	}
 }
 
+func (s *Service) Name() string {
+	return "PluginService"
+}
+
+// Register a new plugin and put it in the proper container
 func (s *Service) Register(plugin browserk.Plugin) {
 	plugins := s.getPluginsOfType(plugin.Options().ExecutionType)
 	plugins.Add(plugin)
 }
 
+// Store gives access to the plugin store so plugins can add data
 func (s *Service) Store() browserk.PluginStorer {
 	return s.pluginStore
 }
@@ -77,9 +87,12 @@ func (s *Service) Unregister(plugin browserk.Plugin) {
 // Init the plugin manager
 func (s *Service) Init(ctx context.Context) error {
 	s.ctx = ctx
-	importPlugins(s)
+	// do this first cause it has the highest chance of failing
+	if err := s.importJSPlugins(); err != nil {
+		return err
+	}
+	s.importPlugins()
 	go s.listenForEvents()
-	// TODO: load plugins
 
 	return nil
 }
@@ -123,8 +136,38 @@ func (s *Service) listenForEvents() {
 	}
 }
 
-func importPlugins(s *Service) {
+func (s *Service) importPlugins() {
 	s.Register(cookies.New(s))
 	s.Register(headers.New(s))
 	s.Register(storage.New(s))
+}
+
+func (s *Service) importJSPlugins() error {
+	if s.cfg.JSPluginPath == "" {
+		return nil
+	}
+
+	plugins := make([]string, 0)
+	if err := filepath.Walk(s.cfg.JSPluginPath, func(path string, info os.FileInfo, err error) error {
+		if info.IsDir() {
+			return nil
+		}
+
+		if strings.HasSuffix(info.Name(), ".js") {
+			plugins = append(plugins, path)
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	for _, filePath := range plugins {
+		p := NewJSPluginFromFile(s, filePath)
+		if err := p.Init(); err != nil {
+			return err
+		}
+		log.Info().Str("plugin", filePath).Msg("loaded plugin")
+		s.Register(p)
+	}
+	return nil
 }
