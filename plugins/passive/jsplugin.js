@@ -10,7 +10,7 @@ var ExecAlways = 6;
         this.service = service;
     }
     Plugin.prototype.Name = function () {
-        return "PLUGIN NAME: " + this.service;
+        return "PLUGIN NAME: " + this.service.Name();
     }
 
     Plugin.prototype.ID = function () {

@@ -4,6 +4,7 @@ ExcludedURIs = ["/logout.php", "/offscanpages/statistics.php"]
 DataPath = "browserktmp"
 NumBrowsers = 5
 MaxDepth = 25
+JSPluginPath = "plugins/"
 
 [FormData]
 UserName  = "testuser1"

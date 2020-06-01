@@ -1,7 +1,6 @@
 package headers
 
 import (
-	"github.com/davecgh/go-spew/spew"
 	"github.com/rs/zerolog/log"
 	"gitlab.com/browserker/browserk"
 )
@@ -47,5 +46,4 @@ func (h *Plugin) Ready(browser browserk.Browser) (bool, error) {
 // OnEvent handles passive events
 func (h *Plugin) OnEvent(evt *browserk.PluginEvent) {
 	log.Info().Msg("GOT HEADER EVENT")
-	spew.Dump(evt.EventData)
 }
